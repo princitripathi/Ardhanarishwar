@@ -679,3 +679,15 @@ The `docs/` directory is currently empty. Documentation is maintained in this RE
 **Princi Tripathi**
 
 [github.com/princitripathi](https://github.com/princitripathi)
+
+---
+
+## About the Developer
+
+**Princi Tripathi**
+
+AI-focused Computer Science & Engineering student building practical AI applications with Generative AI, LLMs, agent-based systems, and modern web technologies.
+
+- 🌐 [Portfolio](https://princitripathi.github.io/)
+- 💼 [LinkedIn](https://www.linkedin.com/in/princi-tripathi/)
+- 🐙 [GitHub](https://github.com/princitripathi/Ardhanarishwar)
