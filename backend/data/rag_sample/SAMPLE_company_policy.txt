@@ -1,0 +1,32 @@
+# SAMPLE DATA - FOR TESTING ONLY
+# This document is synthetic sample data for RAG prototype testing.
+# It does NOT contain real company information. Marked clearly as sample.
+# Used to verify retrieval, chunking, and context injection logic.
+
+Title: Sample Company Policy - Leave and Remote Work
+Source: sample_company_policy.txt
+Category: HR Policy (Sample)
+
+## Leave Policy (Sample)
+Employees at SampleCorp are entitled to 24 days of paid annual leave per year.
+Leave must be requested at least 7 days in advance via the HR portal.
+Sick leave is 12 days per year with medical certificate required beyond 3 consecutive days.
+Maternity leave is 26 weeks as per SampleCorp sample policy.
+Unused annual leave can be carried forward up to 5 days to the next calendar year.
+
+## Remote Work Policy (Sample)
+SampleCorp follows a hybrid remote work model.
+Employees may work remotely up to 3 days per week with manager approval.
+Core collaboration hours are 11:00 AM to 3:00 PM IST for remote staff.
+All remote work requests must be logged in the attendance system.
+Equipment for remote work is provided after probation period of 3 months.
+
+## Interview Process (Sample)
+SampleCorp interview process has 4 stages: Resume Screening, Technical Round, Managerial Round, HR Discussion.
+Technical interviews focus on data structures, system design, and role-specific skills.
+Candidates are evaluated on technical accuracy, communication, and cultural fit.
+
+## Learning Resources (Sample)
+SampleCorp encourages employees to complete at least 40 hours of learning per year.
+Recommended platforms include internal SampleCorp Learning Hub and external MOOCs.
+Certifications in cloud, AI, and data are reimbursed up to INR 25,000 per year.

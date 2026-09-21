@@ -7,6 +7,14 @@ from app.interview.llm_helpers import extract_json, normalize_evaluation
 
 logger = logging.getLogger(__name__)
 
+try:
+    from app.services.validation import validate_evaluation
+    _VALIDATION_AVAILABLE = True
+except Exception as _e:
+    logger.warning(f"Evaluator validation not available: {_e}")
+    _VALIDATION_AVAILABLE = False
+    validate_evaluation = lambda *a, **k: (True, [], None)
+
 
 async def evaluate_answer(
     question: Dict,
@@ -40,6 +48,12 @@ Evaluate and return JSON only.
             logger.warning(f"Evaluator JSON parse failed, raw: {resp.response[:500]}")
             return _heuristic_eval(answer)
         normalized = normalize_evaluation(raw)
+        # Phase 7: validate required fields
+        if _VALIDATION_AVAILABLE:
+            is_valid, issues, _ = validate_evaluation(normalized)
+            if not is_valid:
+                logger.warning(f"Evaluation validation failed: {issues}, using heuristic fallback")
+                return _heuristic_eval(answer)
         # Additional inconsistency check heuristic overlay
         inconsistency = _detect_inconsistency(answer, resume_text)
         if inconsistency and not normalized["inconsistency_flag"]:

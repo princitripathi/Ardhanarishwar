@@ -1,0 +1,2200 @@
+{
+  "summary": {
+    "mode": "mock",
+    "total_cases": 45,
+    "routing_accuracy": 1.0,
+    "correct": 45,
+    "total": 45,
+    "per_domain": {
+      "career": 6,
+      "resume": 6,
+      "interview": 7,
+      "learning": 6,
+      "recruitment": 7,
+      "business": 5,
+      "general": 8
+    },
+    "per_domain_accuracy": {
+      "career": 1.0,
+      "resume": 1.0,
+      "interview": 1.0,
+      "learning": 1.0,
+      "recruitment": 1.0,
+      "business": 1.0,
+      "general": 1.0
+    },
+    "latency": {
+      "mean_ms": 11.6,
+      "median_ms": 2.7,
+      "p95_ms": 9.9,
+      "min_ms": 2.2,
+      "max_ms": 376.0
+    },
+    "hallucination_flags": 0,
+    "error_flags": 0,
+    "relevance_mean": 0.89,
+    "completeness_pass": 39,
+    "completeness_pass_rate": 0.87,
+    "context_results": 6,
+    "note": "Automated heuristics are NOT ground truth. Human review required for relevance/completeness/hallucination."
+  },
+  "results": [
+    {
+      "id": "career-01",
+      "domain": "career",
+      "message": "Help me plan my career growth for the next 2 years",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance",
+      "latency_ms": 376.0,
+      "response": "Mock response for career about Help me plan my career growth for the ne. Keywords: career growth plan. This is a helpful answer with bullet points:\n- Point one about career\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.6,
+        "matched": [
+          "career",
+          "growth",
+          "plan"
+        ],
+        "total": 5
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "career-02",
+      "domain": "career",
+      "message": "I want to change my career from marketing to data science",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance",
+      "latency_ms": 3.6,
+      "response": "Mock response for career about I want to change my career from marketin. Keywords: career transition data science. This is a helpful answer with bullet points:\n- Point one about career\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.6,
+        "matched": [
+          "career",
+          "transition",
+          "data science"
+        ],
+        "total": 5
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "career-03",
+      "domain": "career",
+      "message": "How do I become a data scientist? What steps should I take?",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance",
+      "latency_ms": 2.7,
+      "response": "Mock response for career about How do I become a data scientist? What s. Keywords: data scientist career skill. This is a helpful answer with bullet points:\n- Point one about career\n- Point two with guidance.",
+      "response_word_count": 37,
+      "relevance": {
+        "score": 0.6,
+        "matched": [
+          "data scientist",
+          "career",
+          "skill"
+        ],
+        "total": 5
+      },
+      "completeness": {
+        "word_count": 37,
+        "sentence_count": 4,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "career-04",
+      "domain": "career",
+      "message": "What career path suits someone with Python and communication skills?",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance",
+      "latency_ms": 2.5,
+      "response": "Mock response for career about What career path suits someone with Pyth. Keywords: career path python. This is a helpful answer with bullet points:\n- Point one about career\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "career",
+          "path",
+          "python"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "career-05",
+      "domain": "career",
+      "message": "I got a promotion offer but also a new job — career advice?",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance",
+      "latency_ms": 4.1,
+      "response": "Mock response for career about I got a promotion offer but also a new j. Keywords: career promotion advice. This is a helpful answer with bullet points:\n- Point one about career\n- Point two with guidance.",
+      "response_word_count": 37,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "career",
+          "promotion",
+          "advice"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 37,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "resume-01",
+      "domain": "resume",
+      "message": "How can I improve my resume for a software engineer role?",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 5.1,
+      "response": "Mock response for resume about How can I improve my resume for a softwa. Keywords: resume software engineer improve. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 37,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "resume",
+          "software engineer",
+          "improve"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 37,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "resume-02",
+      "domain": "resume",
+      "message": "Review my CV for ATS compliance and structure",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 2.6,
+      "response": "Mock response for resume about Review my CV for ATS compliance and stru. Keywords: cv ATS structure. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 35,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "cv",
+          "ATS",
+          "structure",
+          "resume"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 35,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "resume-03",
+      "domain": "resume",
+      "message": "Write a cover letter for an AI Engineer position",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 2.5,
+      "response": "Mock response for resume about Write a cover letter for an AI Engineer . Keywords: cover letter AI Engineer resume. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 38,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "cover letter",
+          "AI Engineer",
+          "resume"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 38,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "resume-04",
+      "domain": "resume",
+      "message": "My resume structure is confusing, help me fix it",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 3.1,
+      "response": "Mock response for resume about My resume structure is confusing, help m. Keywords: resume structure format. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "resume",
+          "structure",
+          "format"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "resume-05",
+      "domain": "resume",
+      "message": "Tips for job application resume formatting for FAANG",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 3.3,
+      "response": "Mock response for resume about Tips for job application resume formatti. Keywords: resume job application format. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "resume",
+          "job application",
+          "format"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "interview-01",
+      "domain": "interview",
+      "message": "Help me prepare for an AI/ML interview",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 1, 'learning': 0, 'career': 0, 'business': 0})",
+      "latency_ms": 3.1,
+      "response": "Mock response for interview about Help me prepare for an AI/ML interview. Keywords: interview AI ML. This is a helpful answer with bullet points:\n- Point one about interview\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 0.8,
+        "matched": [
+          "interview",
+          "AI",
+          "ML",
+          "prepare"
+        ],
+        "total": 5
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "interview-02",
+      "domain": "interview",
+      "message": "Give me behavioral interview questions for a manager role",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation",
+      "latency_ms": 3.2,
+      "response": "Mock response for interview about Give me behavioral interview questions f. Keywords: behavioral interview manager. This is a helpful answer with bullet points:\n- Point one about interview\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "behavioral",
+          "interview",
+          "manager"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "interview-03",
+      "domain": "interview",
+      "message": "Mock interview for backend engineer with system design focus",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation",
+      "latency_ms": 2.4,
+      "response": "Mock response for interview about Mock interview for backend engineer with. Keywords: mock interview backend system design. This is a helpful answer with bullet points:\n- Point one about interview\n- Point two with guidance.",
+      "response_word_count": 35,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "mock interview",
+          "backend",
+          "system design"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 35,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "interview-04",
+      "domain": "interview",
+      "message": "How to answer technical interview problem solving questions?",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation",
+      "latency_ms": 2.4,
+      "response": "Mock response for interview about How to answer technical interview proble. Keywords: technical interview problem solving question. This is a helpful answer with bullet points:\n- Point one about interview\n- Point two with guidance.",
+      "response_word_count": 35,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "technical interview",
+          "problem solving",
+          "question"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 35,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "interview-05",
+      "domain": "interview",
+      "message": "Interview preparation tips for a fresher",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation",
+      "latency_ms": 2.8,
+      "response": "Mock response for interview about Interview preparation tips for a fresher. Keywords: interview preparation tips. This is a helpful answer with bullet points:\n- Point one about interview\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "interview",
+          "preparation",
+          "tips"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "learning-01",
+      "domain": "learning",
+      "message": "I want to learn Generative AI, where should I start?",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance",
+      "latency_ms": 11.7,
+      "response": "Mock response for learning about I want to learn Generative AI, where sho. Keywords: learn Generative AI roadmap. This is a helpful answer with bullet points:\n- Point one about learning\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "learn",
+          "Generative AI",
+          "roadmap"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "learning-02",
+      "domain": "learning",
+      "message": "Create a roadmap to become a Machine Learning Engineer",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance",
+      "latency_ms": 4.8,
+      "response": "Mock response for learning about Create a roadmap to become a Machine Lea. Keywords: roadmap Machine Learning learn. This is a helpful answer with bullet points:\n- Point one about learning\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "roadmap",
+          "Machine Learning",
+          "learn"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "learning-03",
+      "domain": "learning",
+      "message": "What courses should I take for data science?",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 0, 'learning': 1, 'career': 0, 'business': 0})",
+      "latency_ms": 2.6,
+      "response": "Mock response for learning about What courses should I take for data scie. Keywords: courses data science learn. This is a helpful answer with bullet points:\n- Point one about learning\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "courses",
+          "data science",
+          "learn"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "learning-04",
+      "domain": "learning",
+      "message": "Recommend certifications for cloud AI and MLOps",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 0, 'learning': 1, 'career': 0, 'business': 0})",
+      "latency_ms": 2.5,
+      "response": "Mock response for learning about Recommend certifications for cloud AI an. Keywords: certification cloud AI. This is a helpful answer with bullet points:\n- Point one about learning\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "certification",
+          "cloud",
+          "AI"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "learning-05",
+      "domain": "learning",
+      "message": "What skills should I learn to become a Generative AI Engineer?",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance",
+      "latency_ms": 3.9,
+      "response": "Mock response for learning about What skills should I learn to become a G. Keywords: skills learn Generative AI. This is a helpful answer with bullet points:\n- Point one about learning\n- Point two with guidance.",
+      "response_word_count": 37,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "skills",
+          "learn",
+          "Generative AI"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 37,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "recruitment-01",
+      "domain": "recruitment",
+      "message": "We need to hire 3 Python developers, can you draft a job description?",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 2.6,
+      "response": "Mock response for recruitment about We need to hire 3 Python developers, can. Keywords: hire job description Python. This is a helpful answer with bullet points:\n- Point one about recruitment\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "hire",
+          "job description",
+          "Python"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "recruitment-02",
+      "domain": "recruitment",
+      "message": "Help with candidate screening for a data analyst role",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 3.7,
+      "response": "Mock response for recruitment about Help with candidate screening for a data. Keywords: candidate screening data analyst. This is a helpful answer with bullet points:\n- Point one about recruitment\n- Point two with guidance.",
+      "response_word_count": 35,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "candidate",
+          "screening",
+          "data analyst"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 35,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "recruitment-03",
+      "domain": "recruitment",
+      "message": "Talent acquisition strategy for a startup hiring AI talent",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 2.6,
+      "response": "Mock response for recruitment about Talent acquisition strategy for a startu. Keywords: talent acquisition hiring recruitment. This is a helpful answer with bullet points:\n- Point one about recruitment\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "talent acquisition",
+          "hiring",
+          "recruitment"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "recruitment-04",
+      "domain": "recruitment",
+      "message": "Write a job posting for a senior recruiter",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help (low confidence, scores {'recruitment': 1, 'resume': 0, 'interview': 0, 'learning': 0, 'career': 0, 'business': 0})",
+      "latency_ms": 3.3,
+      "response": "Mock response for recruitment about Write a job posting for a senior recruit. Keywords: job posting recruitment hire. This is a helpful answer with bullet points:\n- Point one about recruitment\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "job posting",
+          "recruitment",
+          "hire"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "recruitment-05",
+      "domain": "recruitment",
+      "message": "Headcount planning and staffing for Q3",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 2.4,
+      "response": "Mock response for recruitment about Headcount planning and staffing for Q3. Keywords: headcount staffing recruitment. This is a helpful answer with bullet points:\n- Point one about recruitment\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "headcount",
+          "staffing",
+          "recruitment"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "business-01",
+      "domain": "business",
+      "message": "How can our company improve workforce productivity?",
+      "expected_intent": "business",
+      "actual_intent": "business",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for business and workforce assistance",
+      "latency_ms": 2.4,
+      "response": "Mock response for business about How can our company improve workforce pr. Keywords: workforce productivity company. This is a helpful answer with bullet points:\n- Point one about business\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "workforce",
+          "productivity",
+          "company"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "business-02",
+      "domain": "business",
+      "message": "HR assistance for employee onboarding process",
+      "expected_intent": "business",
+      "actual_intent": "business",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for business and workforce assistance",
+      "latency_ms": 2.3,
+      "response": "Mock response for business about HR assistance for employee onboarding pr. Keywords: HR employee onboarding. This is a helpful answer with bullet points:\n- Point one about business\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "HR",
+          "employee",
+          "onboarding"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "business-03",
+      "domain": "business",
+      "message": "Business process optimization for sales and management",
+      "expected_intent": "business",
+      "actual_intent": "business",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for business and workforce assistance",
+      "latency_ms": 3.1,
+      "response": "Mock response for business about Business process optimization for sales . Keywords: business process management. This is a helpful answer with bullet points:\n- Point one about business\n- Point two with guidance.",
+      "response_word_count": 33,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "business",
+          "process",
+          "management",
+          "optimization"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 33,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "business-04",
+      "domain": "business",
+      "message": "Workplace organization and enterprise stakeholder management",
+      "expected_intent": "business",
+      "actual_intent": "business",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for business and workforce assistance",
+      "latency_ms": 2.7,
+      "response": "Mock response for business about Workplace organization and enterprise st. Keywords: workplace enterprise stakeholder. This is a helpful answer with bullet points:\n- Point one about business\n- Point two with guidance.",
+      "response_word_count": 32,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "workplace",
+          "enterprise",
+          "stakeholder",
+          "organization"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 32,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "business-05",
+      "domain": "business",
+      "message": "Our revenue is flat, suggest corporate strategy improvements",
+      "expected_intent": "business",
+      "actual_intent": "business",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for business and workforce assistance",
+      "latency_ms": 3.7,
+      "response": "Mock response for business about Our revenue is flat, suggest corporate s. Keywords: revenue corporate business. This is a helpful answer with bullet points:\n- Point one about business\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "revenue",
+          "corporate",
+          "business"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "general-01",
+      "domain": "general",
+      "message": "Hello, how are you?",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.4,
+      "response": "Mock response for general about Hello, how are you?. Keywords: hello help assist. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 31,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "hello",
+          "help",
+          "assist"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 31,
+        "sentence_count": 4,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "general-02",
+      "domain": "general",
+      "message": "Tell me a joke",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.2,
+      "response": "Mock response for general about Tell me a joke. Keywords: joke humor. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 30,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "joke",
+          "humor"
+        ],
+        "total": 2
+      },
+      "completeness": {
+        "word_count": 30,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "general-03",
+      "domain": "general",
+      "message": "What's the weather like today?",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant",
+      "latency_ms": 2.4,
+      "response": "Mock response for general about What's the weather like today?. Keywords: weather. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 30,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "weather"
+        ],
+        "total": 1
+      },
+      "completeness": {
+        "word_count": 30,
+        "sentence_count": 4,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "general-04",
+      "domain": "general",
+      "message": "Explain what Ardhanarishwar does",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 3.0,
+      "response": "Mock response for general about Explain what Ardhanarishwar does. Keywords: Ardhanarishwar career interview. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 31,
+      "relevance": {
+        "score": 0.75,
+        "matched": [
+          "Ardhanarishwar",
+          "career",
+          "interview"
+        ],
+        "total": 4
+      },
+      "completeness": {
+        "word_count": 31,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "general-05",
+      "domain": "general",
+      "message": "Thanks for your help!",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.3,
+      "response": "Mock response for general about Thanks for your help!. Keywords: welcome help assist. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 31,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "welcome",
+          "help",
+          "assist"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 31,
+        "sentence_count": 4,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "edge-01",
+      "domain": "general",
+      "message": "Do you have access to live job listings? Can you fetch jobs for me right now?",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant",
+      "latency_ms": 3.6,
+      "response": "Mock response for general about Do you have access to live job listings?. Keywords: general job listings. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 35,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "general",
+          "job listings"
+        ],
+        "total": 2
+      },
+      "completeness": {
+        "word_count": 35,
+        "sentence_count": 4,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "edge-02",
+      "domain": "general",
+      "message": "Can you browse the internet for the latest AI news?",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant",
+      "latency_ms": 2.7,
+      "response": "Mock response for general about Can you browse the internet for the late. Keywords: browse internet. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 34,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "browse",
+          "internet"
+        ],
+        "total": 2
+      },
+      "completeness": {
+        "word_count": 34,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "edge-03",
+      "domain": "resume",
+      "message": "Can you score my resume with an exact ATS score like 87/100?",
+      "expected_intent": "resume",
+      "actual_intent": "resume",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for resume help",
+      "latency_ms": 2.7,
+      "response": "Mock response for resume about Can you score my resume with an exact AT. Keywords: resume ATS score. This is a helpful answer with bullet points:\n- Point one about resume\n- Point two with guidance.",
+      "response_word_count": 36,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "resume",
+          "ATS",
+          "score"
+        ],
+        "total": 3
+      },
+      "completeness": {
+        "word_count": 36,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "edge-04",
+      "domain": "general",
+      "message": "I need help with my application",
+      "expected_intent": "general",
+      "actual_intent": "general",
+      "routing_correct": true,
+      "routing_reason": "No specialized intent detected, using general assistant",
+      "latency_ms": 2.3,
+      "response": "Mock response for general about I need help with my application. Keywords: application help. This is a helpful answer with bullet points:\n- Point one about general\n- Point two with guidance.",
+      "response_word_count": 32,
+      "relevance": {
+        "score": 1.0,
+        "matched": [
+          "application",
+          "help"
+        ],
+        "total": 2
+      },
+      "completeness": {
+        "word_count": 32,
+        "sentence_count": 3,
+        "has_bullets_or_list": true,
+        "min_words": 20,
+        "passed": true
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-01-career-to-learning|I want to become a Generative ",
+      "domain": "career",
+      "message": "I want to become a Generative AI Engineer",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 0, 'learning': 0, 'career': 1, 'business': 0})",
+      "latency_ms": 9.9,
+      "response": "Mock follow-up for career. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-01-career-to-learning|What should I learn first?",
+      "domain": "learning",
+      "message": "What should I learn first?",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance",
+      "latency_ms": 3.5,
+      "response": "Mock follow-up for learning. Context includes Generative AI. Helpful answer.",
+      "response_word_count": 10,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 10,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "Generative AI",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-02-recruitment-followup|We need to hire Python develop",
+      "domain": "recruitment",
+      "message": "We need to hire Python developers",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 2.6,
+      "response": "Mock follow-up for recruitment. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-02-recruitment-followup|What about screening them?",
+      "domain": "recruitment",
+      "message": "What about screening them?",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.4,
+      "response": "Mock follow-up for recruitment. Context includes Python. Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "Python",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-03-interview-context|Help me prepare for an AI/ML i",
+      "domain": "interview",
+      "message": "Help me prepare for an AI/ML interview",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 1, 'learning': 0, 'career': 0, 'business': 0})",
+      "latency_ms": 2.3,
+      "response": "Mock follow-up for interview. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-03-interview-context|Tell me more",
+      "domain": "interview",
+      "message": "Tell me more",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.2,
+      "response": "Mock follow-up for interview. Context includes AI/ML. Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "AI/ML",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    }
+  ],
+  "context_details": [
+    {
+      "id": "ctx-01-career-to-learning|I want to become a Generative ",
+      "domain": "career",
+      "message": "I want to become a Generative AI Engineer",
+      "expected_intent": "career",
+      "actual_intent": "career",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for career guidance (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 0, 'learning': 0, 'career': 1, 'business': 0})",
+      "latency_ms": 9.9,
+      "response": "Mock follow-up for career. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-01-career-to-learning|What should I learn first?",
+      "domain": "learning",
+      "message": "What should I learn first?",
+      "expected_intent": "learning",
+      "actual_intent": "learning",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for skills and learning guidance",
+      "latency_ms": 3.5,
+      "response": "Mock follow-up for learning. Context includes Generative AI. Helpful answer.",
+      "response_word_count": 10,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 10,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "Generative AI",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-02-recruitment-followup|We need to hire Python develop",
+      "domain": "recruitment",
+      "message": "We need to hire Python developers",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help",
+      "latency_ms": 2.6,
+      "response": "Mock follow-up for recruitment. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-02-recruitment-followup|What about screening them?",
+      "domain": "recruitment",
+      "message": "What about screening them?",
+      "expected_intent": "recruitment",
+      "actual_intent": "recruitment",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for hiring and recruitment help (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.4,
+      "response": "Mock follow-up for recruitment. Context includes Python. Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "Python",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-03-interview-context|Help me prepare for an AI/ML i",
+      "domain": "interview",
+      "message": "Help me prepare for an AI/ML interview",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation (low confidence, scores {'recruitment': 0, 'resume': 0, 'interview': 1, 'learning': 0, 'career': 0, 'business': 0})",
+      "latency_ms": 2.3,
+      "response": "Mock follow-up for interview. Context includes . Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": false,
+        "passed": null,
+        "note": "no context_check defined"
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    },
+    {
+      "id": "ctx-03-interview-context|Tell me more",
+      "domain": "interview",
+      "message": "Tell me more",
+      "expected_intent": "interview",
+      "actual_intent": "interview",
+      "routing_correct": true,
+      "routing_reason": "The user is asking for interview preparation (ambiguous query, low confidence low; consider asking clarifying question)",
+      "latency_ms": 2.2,
+      "response": "Mock follow-up for interview. Context includes AI/ML. Helpful answer.",
+      "response_word_count": 9,
+      "relevance": {
+        "score": null,
+        "matched": [],
+        "total": 0,
+        "note": "no keywords defined"
+      },
+      "completeness": {
+        "word_count": 9,
+        "sentence_count": 3,
+        "has_bullets_or_list": false,
+        "min_words": 20,
+        "passed": false
+      },
+      "hallucination": {
+        "hallucination_flag": false,
+        "matched_phrases": []
+      },
+      "error_signal": {
+        "error_flag": false,
+        "matched": []
+      },
+      "context_check": {
+        "checked": true,
+        "context_keyword": "AI/ML",
+        "passed": true
+      },
+      "error_detail": null,
+      "needs_human_review": true
+    }
+  ]
+}

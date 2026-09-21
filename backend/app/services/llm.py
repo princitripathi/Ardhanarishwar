@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import logging
 from typing import AsyncGenerator, Optional
 import httpx
@@ -10,9 +11,17 @@ logger = logging.getLogger(__name__)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 
-SYSTEM_PROMPT = """You are Ardhanarishwar AI Assistant.
+# Health/model cache to avoid duplicate /api/tags calls per request (Phase 8).
+# Measurements show health ~700ms + model ~680ms = 1.4s overhead per generate call.
+# Cache for HEALTH_CACHE_TTL seconds; combines both checks into single HTTP call when miss.
+HEALTH_CACHE_TTL = 10.0
+_health_cache: dict = {"timestamp": 0.0, "healthy": False, "models": [], "last_fetch": 0.0}
 
-Provide useful answers. Be clear and concise. Avoid pretending to have capabilities you do not have. Focus on career, education, professional development, recruitment, business and related assistance. Ask for clarification when the user's request is ambiguous."""
+SYSTEM_PROMPT = """You are Ardhanarishwar Solver, the general assistant for the Ardhanarishwar Solver AI platform (local Qwen 2.5 3B via Ollama).
+
+Provide useful, accurate help across career, education, professional development, recruitment, business and general topics. Be actionable when helpful and concise when the question is simple. If the request is ambiguous or lacks needed detail, ask 1-2 clarifying questions. Never claim live browsing, live data, or verified proprietary databases."""
+
+
 
 
 class ChatRequest(BaseModel):
@@ -31,27 +40,52 @@ class OllamaError(Exception):
         super().__init__(message)
 
 
-async def check_ollama_health() -> bool:
+async def _fetch_tags_cached(force: bool = False) -> dict:
+    """Fetch /api/tags once and populate cache. Returns {healthy, models}."""
+    now = time.monotonic()
+    # Use cache if fresh
+    if not force and (now - _health_cache["timestamp"] < HEALTH_CACHE_TTL) and _health_cache["healthy"]:
+        return {"healthy": _health_cache["healthy"], "models": _health_cache["models"]}
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
-            return response.status_code == 200
+            healthy = response.status_code == 200
+            models = []
+            if healthy:
+                try:
+                    data = response.json()
+                    models = [m.get("name", "") for m in data.get("models", [])]
+                except Exception:
+                    pass
+            _health_cache["timestamp"] = now
+            _health_cache["healthy"] = healthy
+            _health_cache["models"] = models
+            return {"healthy": healthy, "models": models}
     except httpx.RequestError as e:
         logger.error(f"Ollama health check failed: {e}")
-        return False
+        # On failure, cache short negative to avoid hammering but allow retry quickly
+        _health_cache["timestamp"] = now - (HEALTH_CACHE_TTL - 2.0)  # retry after ~2s
+        _health_cache["healthy"] = False
+        return {"healthy": False, "models": []}
+
+
+async def check_ollama_health() -> bool:
+    result = await _fetch_tags_cached()
+    return result["healthy"]
 
 
 async def is_model_available(model: str = OLLAMA_MODEL) -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
-            if response.status_code == 200:
-                data = response.json()
-                models = [m.get("name", "") for m in data.get("models", [])]
-                return model in models
-    except httpx.RequestError as e:
-        logger.error(f"Model availability check failed: {e}")
-    return False
+    result = await _fetch_tags_cached()
+    if not result["healthy"]:
+        return False
+    return model in result["models"]
+
+
+def clear_health_cache() -> None:
+    """For testing: invalidate cache."""
+    _health_cache["timestamp"] = 0.0
+    _health_cache["healthy"] = False
+    _health_cache["models"] = []
 
 
 async def generate_response(message: str, system_prompt: Optional[str] = None) -> ChatResponse:
@@ -70,10 +104,11 @@ async def generate_response(message: str, system_prompt: Optional[str] = None) -
         "prompt": f"{prompt_text}\n\nUser: {message.strip()}\n\nAssistant:",
         "stream": False,
         "keep_alive": "30m",
+        "options": {"num_predict": 250},
     }
 
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{OLLAMA_BASE_URL}/api/generate",
                 json=payload,
@@ -121,7 +156,7 @@ async def generate_response_stream(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=None) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             async with client.stream(
                 "POST", f"{OLLAMA_BASE_URL}/api/generate", json=payload
             ) as response:

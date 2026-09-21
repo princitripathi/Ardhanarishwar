@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { checkBackendHealth, sendChatMessage, sendChatMessageStream } from './api'
 import { InterviewSchedule, InterviewScheduledCard, InterviewLobby, InterviewList } from './InterviewViews'
 import { InterviewSession } from './InterviewSession'
+import { useChatVoice } from './useChatVoice'
 import './App.css'
 
 const suggestions = [
@@ -88,6 +89,8 @@ function App() {
   const [lobbyInterviewId, setLobbyInterviewId] = useState(null)
   const [sessionInterviewId, setSessionInterviewId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [autoSpeak, setAutoSpeak] = useState(true)
+  const voice = useChatVoice()
   const [conversationId, setConversationId] = useState(() => {
     try {
       const stored = localStorage.getItem('ard_conversation_id')
@@ -99,6 +102,7 @@ function App() {
   })
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const [voiceBase, setVoiceBase] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -122,9 +126,29 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Chat voice: handle final transcript -> input, preserve typed text
+  useEffect(() => {
+    voice.setOnFinal((finalText) => {
+      if (finalText != null) {
+        setInputValue(finalText)
+        // focus for editing before send
+        setTimeout(() => inputRef.current?.focus(), 50)
+      }
+    })
+  }, [voice])
+
+  // Stop speech when starting to type or sending
+  useEffect(() => {
+    if (voice.isListening && voice.isSpeaking) voice.cancelSpeak()
+  }, [voice.isListening]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendMessage = async (text) => {
     const message = text.trim()
     if (!message || isLoading) return
+
+    // Prevent overlapping speech: cancel any ongoing TTS before new turn
+    if (voice.isSpeaking) voice.cancelSpeak()
+    if (voice.isListening) voice.stopListening()
 
     setMessages((prev) => [...prev, { role: 'user', content: message }])
     setIsLoading(true)
@@ -179,7 +203,6 @@ function App() {
         },
         conversationId,
       })
-      updateAssistant(streamContent || '(no response)', streamIntent, streamAgent, false)
       if (!gotChunk) {
         const data = await sendChatMessage(message, conversationId)
         if (data.conversation_id && data.conversation_id !== conversationId) {
@@ -187,6 +210,15 @@ function App() {
           try { localStorage.setItem('ard_conversation_id', data.conversation_id) } catch {}
         }
         updateAssistant(data.response, data.intent, data.agent, false)
+        if (autoSpeak && voice.ttsSupported && data.response && !data.response.startsWith('Error:')) {
+          voice.speak(data.response)
+        }
+      } else {
+        const finalStream = streamContent || '(no response)'
+        updateAssistant(finalStream, streamIntent, streamAgent, false)
+        if (autoSpeak && voice.ttsSupported && finalStream && !finalStream.startsWith('Error:')) {
+          voice.speak(finalStream)
+        }
       }
     } catch (err) {
       if (!gotChunk) {
@@ -218,19 +250,50 @@ function App() {
 
   const handleSend = async (e) => {
     e.preventDefault()
-    const text = inputValue
+    if (voice.isListening) voice.stopListening()
+    if (voice.isSpeaking) voice.cancelSpeak()
+    const text = voice.isListening ? (voiceBase || inputValue) : inputValue
+    const finalText = text.trim()
+    if (!finalText) return
     setInputValue('')
-    await sendMessage(text)
+    setVoiceBase('')
+    await sendMessage(finalText)
   }
 
+  const handleVoiceToggle = () => {
+    if (voice.isListening) {
+      voice.stopListening()
+      return
+    }
+    // Preserve typed text
+    setVoiceBase(inputValue)
+    voice.startListening(inputValue)
+  }
+
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value)
+    // If user types while speaking, cancel speech to prevent overlap
+    if (voice.isSpeaking) voice.cancelSpeak()
+  }
+
+  // Display value: preserve typed text + interim transcript when listening
+  const displayValue = voice.isListening && voice.interim
+    ? (voiceBase ? `${voiceBase} ${voice.interim}`.trim() : voice.interim)
+    : inputValue
+
   const handleSuggestion = (prompt) => {
+    if (voice.isSpeaking) voice.cancelSpeak()
+    if (voice.isListening) voice.stopListening()
     sendMessage(prompt)
   }
 
   const handleNewChat = () => {
+    if (voice.isListening) voice.stopListening()
+    if (voice.isSpeaking) voice.cancelSpeak()
     setMessages([])
     setError(null)
     setInputValue('')
+    setVoiceBase('')
     const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
     setConversationId(id)
     try { localStorage.setItem('ard_conversation_id', id) } catch {}
@@ -251,7 +314,7 @@ function App() {
             <div className="brand">
               <div className="brand-mark">◈</div>
               <div className="brand-text">
-                <span className="brand-name">Ardhanarishwar</span>
+                <span className="brand-name">Ardhanarishwar Solver</span>
                 <span className="brand-sub">AI Career & Professional Assistant</span>
               </div>
             </div>
@@ -383,7 +446,7 @@ function App() {
                           <div key={idx} className={`msg-row assistant ${msg.isError ? 'error' : ''}`}>
                             <div className="assistant-avatar">◈</div>
                             <div className="bubble bubble-assistant">
-                              <div className="assistant-label">Ardhanarishwar</div>
+                              <div className="assistant-label">Ardhanarishwar Solver</div>
                               {showThinking ? (
                                 <div className="thinking">
                                   <span>Thinking</span>
@@ -414,17 +477,67 @@ function App() {
 
                 <div className="composer-wrap">
                   {error && <div className="error-banner">{error}</div>}
-                  <form onSubmit={handleSend} className="composer">
+                  {voice.error && <div className="error-banner voice-error" role="status">{voice.error}</div>}
+                  {!voice.isSupported && (
+                    <div className="voice-unsupported" role="status">
+                      Voice input is not available in this browser. Please use Chrome or Edge on desktop, or continue typing.
+                    </div>
+                  )}
+                  {voice.isListening && (
+                    <div className="voice-listening-indicator" role="status" aria-live="polite">
+                      <span className="voice-dot" /> Listening — speak now
+                    </div>
+                  )}
+                  <form onSubmit={handleSend} className={`composer ${voice.isListening ? 'composer--listening' : ''} ${voice.isSpeaking ? 'composer--speaking' : ''}`}>
                     <input
                       ref={inputRef}
                       type="text"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      placeholder="Ask anything…"
+                      value={displayValue}
+                      onChange={handleInputChange}
+                      placeholder={voice.isListening ? 'Listening…' : 'Ask anything…'}
                       disabled={isLoading || status === 'disconnected'}
                       className="composer-input"
+                      aria-label="Message input"
                     />
-                    <button type="submit" disabled={isLoading || !inputValue.trim() || status === 'disconnected'} className="composer-send" aria-label="Send">
+                    {voice.isSupported && (
+                      <button
+                        type="button"
+                        onClick={handleVoiceToggle}
+                        disabled={isLoading || status === 'disconnected'}
+                        className={`composer-mic ${voice.isListening ? 'mic--listening' : ''}`}
+                        aria-label={voice.isListening ? 'Stop recording' : 'Start voice input'}
+                        title={voice.isListening ? 'Stop recording' : 'Start voice input'}
+                      >
+                        {voice.isListening ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="12" height="12" rx="2" /><line x1="12" y1="16" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /></svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3z" /><path d="M19 10a7 7 0 01-14 0" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /></svg>
+                        )}
+                      </button>
+                    )}
+                    {voice.isSpeaking && (
+                      <button
+                        type="button"
+                        onClick={() => voice.cancelSpeak()}
+                        className="composer-mic mic--stop"
+                        aria-label="Stop speaking"
+                        title="Stop speaking"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                      </button>
+                    )}
+                    {!voice.isSpeaking && voice.ttsSupported && messages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAutoSpeak(v => !v)}
+                        className={`composer-mic ${autoSpeak ? 'mic--active' : ''}`}
+                        aria-label={autoSpeak ? 'Mute voice output' : 'Enable voice output'}
+                        title={autoSpeak ? 'Mute voice output' : 'Enable voice output'}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d={autoSpeak ? 'M15.54 8.46a5 5 0 010 7.07' : 'M23 9l-6 6M17 9l6 6'} /></svg>
+                      </button>
+                    )}
+                    <button type="submit" disabled={isLoading || !displayValue.trim() || status === 'disconnected'} className="composer-send" aria-label="Send">
                       {isLoading ? (
                         <span className="send-spinner" />
                       ) : (
@@ -433,7 +546,7 @@ function App() {
                     </button>
                   </form>
                   <div className="composer-hint">
-                    {status === 'disconnected' ? 'Backend is disconnected. Please start the backend server.' : 'Press Enter to send'}
+                    {status === 'disconnected' ? 'Backend is disconnected. Please start the backend server.' : voice.isListening ? 'Listening — press mic to stop' : 'Press Enter to send · Mic for voice input'}
                   </div>
                 </div>
               </div>

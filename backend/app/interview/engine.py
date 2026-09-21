@@ -8,6 +8,17 @@ from app.interview.llm_helpers import extract_json, normalize_question, normaliz
 
 logger = logging.getLogger(__name__)
 
+# Phase 7: lightweight validation for structured interview outputs
+try:
+    from app.services.validation import validate_plan, validate_question, validate_final_report
+    _VALIDATION_AVAILABLE = True
+except Exception as _e:
+    logger.warning(f"Interview validation not available: {_e}")
+    _VALIDATION_AVAILABLE = False
+    validate_plan = lambda *a, **k: (True, [], None)
+    validate_question = lambda *a, **k: (True, [], None)
+    validate_final_report = lambda *a, **k: (True, [], None)
+
 
 async def generate_interview_plan(job_description: str, resume_text: str, job_title: str = "") -> Dict:
     prompt = f"""Job Title: {job_title}
@@ -27,7 +38,14 @@ Generate interview plan JSON as described.
             logger.warning(f"Plan JSON parse failed: {resp.response[:600]}")
             # fallback heuristic
             return _heuristic_plan(job_description, resume_text, job_title)
-        return normalize_plan(raw, job_title)
+        normalized = normalize_plan(raw, job_title)
+        # Phase 7: validate required fields
+        if _VALIDATION_AVAILABLE:
+            is_valid, issues, _ = validate_plan(normalized, job_title)
+            if not is_valid:
+                logger.warning(f"Plan validation failed: {issues}, using heuristic fallback")
+                return _heuristic_plan(job_description, resume_text, job_title)
+        return normalized
     except OllamaError as e:
         logger.error(f"Plan OllamaError: {e.message}")
         return _heuristic_plan(job_description, resume_text, job_title)
@@ -204,6 +222,12 @@ Return JSON only.
         if follow_up and not q.get("is_follow_up"):
             # if we expected follow-up, keep topic same but respect model
             q["topic"] = next_topic
+        # Phase 7: validate required fields
+        if _VALIDATION_AVAILABLE:
+            is_valid, issues, _ = validate_question(q, question_number)
+            if not is_valid:
+                logger.warning(f"Question validation failed: {issues}, using fallback")
+                return _fallback_question(question_number, next_topic, difficulty_hint, follow_up, resume_text, job_description)
         return q
     except OllamaError as e:
         logger.error(f"Question OllamaError: {e.message}")
@@ -270,7 +294,13 @@ Questions & Answers:
         if raw is None:
             logger.warning(f"Final report JSON parse failed: {resp.response[:600]}")
             return _heuristic_report(evaluations, topics_covered)
-        return normalize_final_report(raw, topics_covered)
+        normalized = normalize_final_report(raw, topics_covered)
+        if _VALIDATION_AVAILABLE:
+            is_valid, issues, _ = validate_final_report(normalized, topics_covered)
+            if not is_valid:
+                logger.warning(f"Final report validation failed: {issues}, using heuristic")
+                return _heuristic_report(evaluations, topics_covered)
+        return normalized
     except OllamaError:
         logger.error("Final report Ollama unavailable")
         return _heuristic_report(evaluations, topics_covered)

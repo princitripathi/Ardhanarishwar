@@ -346,7 +346,7 @@ export function InterviewLobby({ interviewId, onBack, onStartSession }) {
   return (
     <div className="interview-lobby">
       <div className="lobby-header">
-        <div className="lobby-brand">◈ ARDHANARISHWAR AI</div>
+        <div className="lobby-brand">◈ ARDHANARISHWAR SOLVER AI</div>
         <div className="lobby-title">AI INTERVIEW</div>
       </div>
       <div className="lobby-card">

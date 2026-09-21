@@ -1,12 +1,27 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+import logging
 from typing import List
 from app.interview.models import InterviewCreateRequest, InterviewCreateResponse, InterviewResponse, InterviewSummary
 from app.interview import service
+from app.services.security import sanitize_for_log, is_valid_id, interview_limiter, get_client_key
+
+logger = logging.getLogger(__name__)
+
+def _check_id(iid: str):
+    if not iid or not is_valid_id(iid.strip(), 64):
+        raise HTTPException(status_code=400, detail="Invalid interview_id")
+    if ".." in iid or "/" in iid or "\\" in iid:
+        raise HTTPException(status_code=400, detail="Invalid interview_id")
 
 router = APIRouter(prefix="/api/interviews", tags=["interviews"])
 
 @router.post("", response_model=InterviewCreateResponse, status_code=201)
-async def create_interview(payload: InterviewCreateRequest):
+async def create_interview(payload: InterviewCreateRequest, request: Request):
+    # Rate limit interview creation
+    key = get_client_key(request)
+    allowed, retry_after = interview_limiter.is_allowed(key)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=f"Too many requests. Try again in {retry_after}s")
     try:
         data = payload.model_dump()
         interview = service.create_interview(data)
@@ -20,7 +35,8 @@ async def create_interview(payload: InterviewCreateRequest):
             job_title=interview["job_title"],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"create_interview failed: {sanitize_for_log(str(e), 300)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("", response_model=List[InterviewSummary])
 async def list_interviews():
@@ -42,6 +58,7 @@ async def list_interviews():
 
 @router.get("/{interview_id}")
 async def get_interview(interview_id: str):
+    _check_id(interview_id)
     interview = service.get_interview(interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -65,6 +82,7 @@ async def get_interview(interview_id: str):
 
 @router.post("/{interview_id}/start")
 async def start_interview(interview_id: str):
+    _check_id(interview_id)
     interview = service.get_interview(interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -82,6 +100,7 @@ async def start_interview(interview_id: str):
 
 @router.post("/{interview_id}/cancel")
 async def cancel_interview(interview_id: str):
+    _check_id(interview_id)
     interview = service.get_interview(interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")

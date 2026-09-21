@@ -693,7 +693,7 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     return (
       <div className="interview-session completed" ref={containerRef}>
         <div className="session-header">
-          <div className="session-brand">◈ ARDHANARISHWAR AI</div>
+          <div className="session-brand">◈ ARDHANARISHWAR SOLVER AI</div>
           <div className="session-title">INTERVIEW COMPLETED</div>
           {interview && <div className="session-sub">{interview.job_title} • {interview.candidate_name}</div>}
         </div>
@@ -736,7 +736,7 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     return (
       <div className="interview-session setup" ref={containerRef}>
         <div className="session-header">
-          <div className="session-brand">◈ ARDHANARISHWAR AI</div>
+          <div className="session-brand">◈ ARDHANARISHWAR SOLVER AI</div>
           <div className="session-title">AI INTERVIEW SETUP</div>
           {interview && <div className="session-sub">{interview.job_title} • {interview.candidate_name}</div>}
         </div>
@@ -815,7 +815,7 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     <div className="interview-session voice" ref={containerRef}>
       <div className="session-header voice-header">
         <div className="voice-header-left">
-          <div className="session-brand">◈ ARDHANARISHWAR AI</div>
+          <div className="session-brand">◈ ARDHANARISHWAR SOLVER AI</div>
           <div className="session-title">AI INTERVIEW</div>
           {interview && <div className="session-sub">{interview.job_title} • Question {qNum} of {total}</div>}
         </div>

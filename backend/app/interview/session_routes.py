@@ -1,13 +1,18 @@
 import os
+import logging
+import re
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
 from app.interview.service import get_interview, get_window_info
 import app.interview.session_service as sess_svc
 from app.interview.engine import generate_interview_plan, generate_next_question, generate_final_report
 from app.interview.evaluator import evaluate_answer
+from app.services.security import sanitize_for_log, is_valid_id, interview_limiter, get_client_key
+
+logger = logging.getLogger(__name__)
 
 
 def _is_session_time_expired(sess: dict, interview: dict) -> bool:
@@ -69,6 +74,27 @@ class SessionAnswerRequest(BaseModel):
     session_id: str
     answer: str
 
+    @field_validator("session_id")
+    @classmethod
+    def check_sid(cls, v):
+        if not v or not v.strip():
+            raise ValueError("session_id is required")
+        if len(v.strip()) > 64 or not is_valid_id(v.strip(), 64):
+            raise ValueError("invalid session_id")
+        return v.strip()
+
+    @field_validator("answer")
+    @classmethod
+    def check_answer(cls, v):
+        if v is None or not isinstance(v, str):
+            raise ValueError("Answer must be a string")
+        # Let empty check be handled by endpoint to keep string detail for test
+        if not v.strip():
+            return v
+        if len(v.strip()) > 5000:
+            raise ValueError("Answer too long (max 5000 chars)")
+        return v.strip()
+
 class SessionEvaluationPublic(BaseModel):
     score: int
     feedback: str
@@ -109,6 +135,20 @@ def _validate_total_questions(n: Optional[int]) -> int:
     return ni
 
 
+def _check_interview_id(interview_id: str):
+    if not interview_id or not isinstance(interview_id, str) or not is_valid_id(interview_id.strip(), 64):
+        raise HTTPException(status_code=400, detail="Invalid interview_id")
+    if ".." in interview_id or "/" in interview_id or "\\" in interview_id:
+        raise HTTPException(status_code=400, detail="Invalid interview_id")
+
+
+def _rate_limit_or_429(request: Request):
+    key = get_client_key(request)
+    allowed, retry_after = interview_limiter.is_allowed(key)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=f"Too many requests. Try again in {retry_after}s")
+
+
 def _safe_session_response(sess: dict, include_question: bool = True):
     """Return safe candidate-facing data."""
     questions = sess.get("questions_asked") or []
@@ -140,7 +180,10 @@ def _safe_session_response(sess: dict, include_question: bool = True):
 
 
 @router.post("/{interview_id}/session/start")
-async def start_session(interview_id: str, payload: Optional[SessionStartRequest] = None):
+async def start_session(interview_id: str, payload: Optional[SessionStartRequest] = None, request: Request = None):
+    _check_interview_id(interview_id)
+    if request is not None:
+        _rate_limit_or_429(request)
     if payload is None:
         payload = SessionStartRequest()
     total_questions = _validate_total_questions(payload.total_questions)
@@ -199,7 +242,8 @@ async def start_session(interview_id: str, payload: Optional[SessionStartRequest
             total_questions=total_questions,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate interview: {str(e)}")
+        logger.exception(f"start_session generate failed: {sanitize_for_log(str(e), 300)}")
+        raise HTTPException(status_code=500, detail="Failed to generate interview. Please try again.")
 
     sess = sess_svc.create_session(interview_id, plan, first_q, total_questions)
 
@@ -221,7 +265,8 @@ async def start_session(interview_id: str, payload: Optional[SessionStartRequest
 
 
 @router.get("/{interview_id}/session")
-async def get_session_info(interview_id: str):
+async def get_session_info(interview_id: str, request: Request = None):
+    _check_interview_id(interview_id)
     interview = get_interview(interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -258,10 +303,12 @@ async def get_session_info(interview_id: str):
 
 
 @router.post("/{interview_id}/session/answer")
-async def submit_answer(interview_id: str, payload: SessionAnswerRequest):
-    if not payload.session_id or not payload.session_id.strip():
-        raise HTTPException(status_code=422, detail="session_id is required")
-    if payload.answer is None or not payload.answer.strip():
+async def submit_answer(interview_id: str, payload: SessionAnswerRequest, request: Request = None):
+    _check_interview_id(interview_id)
+    if request is not None:
+        _rate_limit_or_429(request)
+    # Validate answer not empty (keep string detail for test)
+    if not payload.answer or not payload.answer.strip():
         raise HTTPException(status_code=422, detail="Answer cannot be empty")
     answer_text = payload.answer.strip()
     # Could also allow answer via STT later, keep as text only for now
@@ -326,7 +373,8 @@ async def submit_answer(interview_id: str, payload: SessionAnswerRequest):
             topic=current_q.get("topic", ""),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
+        logger.exception(f"evaluation failed: {sanitize_for_log(str(e), 300)}")
+        raise HTTPException(status_code=500, detail="Evaluation failed. Please try again.")
 
     # Check if this was the last question
     answers = sess.get("answers") or []
@@ -400,7 +448,8 @@ async def submit_answer(interview_id: str, payload: SessionAnswerRequest):
                 total_questions=total,
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to generate next question: {str(e)}")
+            logger.exception(f"next question generate failed: {sanitize_for_log(str(e), 300)}")
+            raise HTTPException(status_code=500, detail="Failed to generate next question. Please try again.")
 
         # Persist
         updated = sess_svc.append_answer_and_evaluation(payload.session_id, answer_text, evaluation, next_question=next_q)
@@ -418,7 +467,8 @@ async def submit_answer(interview_id: str, payload: SessionAnswerRequest):
 
 
 @router.post("/{interview_id}/session/end")
-async def end_session(interview_id: str, payload: Optional[dict] = None):
+async def end_session(interview_id: str, payload: Optional[dict] = None, request: Request = None):
+    _check_interview_id(interview_id)
     # payload may contain session_id; if not, use latest by interview
     session_id = None
     if payload and isinstance(payload, dict):

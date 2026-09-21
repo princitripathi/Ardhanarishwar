@@ -1,0 +1,22 @@
+# SAMPLE DATA - FOR TESTING ONLY
+# Synthetic product FAQ for RAG testing. Not real product data.
+
+Title: Sample Product FAQ - Ardhanarishwar Solver Platform
+Source: sample_product_faq.txt
+
+## What is Ardhanarishwar Solver? (Sample)
+Ardhanarishwar Solver is a sample AI platform demonstrating career, resume, interview, learning, recruitment and business assistance using a local LLM via Ollama.
+
+## Pricing (Sample)
+This is a prototype. No commercial pricing exists. Sample pricing tier for testing: Free tier with local inference only.
+
+## Support (Sample)
+Sample support hours are Monday to Friday 9 AM to 6 PM IST via sample support channel.
+For technical issues, contact sample-support@samplecorp.example.com (sample address, not real).
+
+## Interview System (Sample)
+The sample interview system supports up to 10 questions per session and generates topics from job description and resume.
+Evaluation dimensions are technical accuracy, relevance, depth, and clarity, each scored 0-10.
+
+## RAG Feature (Sample)
+In this prototype, RAG retrieves from approved local documents only. If no relevant document is found, the system answers from general knowledge and states no approved docs were found.

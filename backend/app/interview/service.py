@@ -98,7 +98,7 @@ def get_interview(interview_id: str) -> Optional[Dict]:
 def list_interviews() -> List[Dict]:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM interview_sessions ORDER BY created_at DESC")
+    cur.execute("SELECT * FROM interview_sessions ORDER BY created_at DESC, rowid DESC")
     rows = cur.fetchall()
     conn.close()
     return [_row_to_dict(r) for r in rows]

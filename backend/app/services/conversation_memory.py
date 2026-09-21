@@ -35,16 +35,32 @@ def add_message(conversation_id: str, role: str, content: str) -> None:
         _conversations[conversation_id] = hist[-MAX_MESSAGES:]
 
 
-def build_context(history: List[Dict[str, str]], limit: int = 6) -> str:
-    """Build concise recent history string, limited to last `limit` messages."""
+def build_context(history: List[Dict[str, str]], limit: int = 4) -> str:
+    """Build concise recent history string, limited to last `limit` messages.
+
+    Improvements for Phase 2:
+    - bounded to 4 messages (8 with default 10-turn cap) to avoid excessive history
+    - truncate to 300 chars per message to keep prompt lean
+    - preserve useful recent context; older messages beyond limit are dropped
+      so irrelevant old content does not dominate the prompt
+    - simple deduplication: skip exact duplicate consecutive messages
+    """
     if not history:
         return ""
     recent = history[-limit:]
     lines = []
+    seen = set()
     for msg in recent:
         role = "User" if msg["role"] == "user" else "Assistant"
-        # truncate each message to avoid bloat
-        content = msg["content"][:400].strip()
+        # keep prompt lean: 300 chars
+        content = msg["content"][:300].strip()
+        if not content:
+            continue
+        # skip exact duplicate consecutive content to avoid bloat
+        key = (role, content)
+        if key in seen:
+            continue
+        seen.add(key)
         lines.append(f"{role}: {content}")
     return "\n".join(lines)
 

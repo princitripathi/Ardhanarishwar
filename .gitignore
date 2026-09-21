@@ -54,3 +54,5 @@ build/
 *.log
 
 data/interviews.db
+data/user_memory.db
+backend/data/user_memory.db
