@@ -50,6 +50,8 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
   const pendingSpeakRef = useRef(null)
   const baseTranscriptRef = useRef('')
   const listeningIntentRef = useRef(false)
+  const transcriptRef = useRef('')
+  useEffect(() => { transcriptRef.current = transcript }, [transcript])
 
   const warningsCount = proctorEvents.filter(e => e.severity === 'warning' || e.severity === 'critical').length
 
@@ -195,8 +197,8 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     rec.onend = () => {
       // Preserve transcript; auto-restart if user still intends to record (allows natural pauses)
       if (listeningIntentRef.current) {
-        // Update base to current transcript before restart
-        baseTranscriptRef.current = transcript
+        // Update base to current transcript before restart (use ref to avoid stale closure)
+        baseTranscriptRef.current = transcriptRef.current
         try {
           // Small delay to avoid rapid restart loops
           setTimeout(() => {

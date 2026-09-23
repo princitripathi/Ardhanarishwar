@@ -2,7 +2,7 @@ import sqlite3
 import os
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List
 
 from app.interview.service import get_interview, get_window_info, update_status
@@ -110,7 +110,7 @@ def list_sessions_for_interview(interview_id: str) -> List[Dict]:
 
 def create_session(interview_id: str, interview_plan: Dict, first_question: Dict, total_questions: int) -> Dict:
     session_id = uuid.uuid4().hex[:16]
-    started_at = datetime.utcnow().isoformat() + "Z"
+    started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     current_topic = first_question.get("topic", interview_plan["topics"][0]["name"] if interview_plan.get("topics") else None)
     conn = get_connection()
     cur = conn.cursor()
@@ -167,7 +167,7 @@ def append_answer_and_evaluation(session_id: str, answer: str, evaluation: Dict,
     answers = sess.get("answers") or []
     evaluations = sess.get("evaluations") or []
     questions = sess.get("questions_asked") or []
-    answers.append({"question_number": sess["question_number"], "answer": answer, "timestamp": datetime.utcnow().isoformat()+"Z"})
+    answers.append({"question_number": sess["question_number"], "answer": answer, "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")})
     evaluations.append(evaluation)
     updates = {
         "answers": answers,
@@ -183,7 +183,7 @@ def append_answer_and_evaluation(session_id: str, answer: str, evaluation: Dict,
 
 
 def complete_session(session_id: str, final_report: Dict) -> Optional[Dict]:
-    completed_at = datetime.utcnow().isoformat() + "Z"
+    completed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     updates = {
         "status": "completed",
         "completed_at": completed_at,

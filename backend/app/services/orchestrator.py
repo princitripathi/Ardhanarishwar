@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Dict, Optional, List, Tuple
 
-from app.services.llm import generate_response, generate_response_stream
+from app.services.llm import generate_response, generate_response_stream, OllamaError
 from app.services import conversation_memory as conv_mem
 
 logger = logging.getLogger(__name__)
@@ -570,7 +570,18 @@ async def _validated_generate(prompt: str, system_prompt: Optional[str], intent:
     attempt = 0
     last_validation = {"is_valid": True, "issues": [], "should_retry": False, "latency_ms": 0}
     while attempt <= max_retries:
-        raw = await generate_response(prompt, system_prompt=system_prompt)
+        try:
+            raw = await generate_response(prompt, system_prompt=system_prompt)
+        except OllamaError as e:
+            logger.warning(f"LLM unavailable during _validated_generate: {e.message}")
+            fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
+            if rag_used:
+                fallback += " (Based on retrieved context where available; general guidance otherwise.)"
+            return fallback, {"is_valid": True, "issues": [f"llm_unavailable:{e.message}"], "should_retry": False, "latency_ms": 0}
+        except Exception as e:
+            logger.warning(f"LLM unexpected error during _validated_generate: {e}")
+            fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
+            return fallback, {"is_valid": True, "issues": ["llm_error"], "should_retry": False, "latency_ms": 0}
         text = raw.response if hasattr(raw, "response") else str(raw)
         if _VALIDATION_AVAILABLE:
             validation = validate_chat_response(text, intent=intent, rag_used=rag_used, rag_results=rag_results, message=message)
@@ -749,8 +760,27 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
     while True:
         try:
             result = await agent_fn(augmented_message, effective_context)
+        except OllamaError as e:
+            logger.warning(f"Agent LLM unavailable for intent {intent}: {e.message}")
+            fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
+            result = {"response": fallback_text, "intent": intent, "agent": intent}
+            last_validation = {"is_valid": True, "issues": [f"llm_unavailable:{e.message}"], "should_retry": False, "latency_ms": 0}
+            break
         except TypeError:
-            result = await agent_fn(augmented_message)
+            try:
+                result = await agent_fn(augmented_message)
+            except OllamaError as e2:
+                logger.warning(f"Agent LLM unavailable (fallback call) for intent {intent}: {e2.message}")
+                fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
+                result = {"response": fallback_text, "intent": intent, "agent": intent}
+                last_validation = {"is_valid": True, "issues": [f"llm_unavailable:{e2.message}"], "should_retry": False, "latency_ms": 0}
+                break
+        except Exception as e:
+            logger.warning(f"Agent unexpected error for intent {intent}: {e}")
+            fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
+            result = {"response": fallback_text, "intent": intent, "agent": intent}
+            last_validation = {"is_valid": True, "issues": ["agent_error"], "should_retry": False, "latency_ms": 0}
+            break
 
         # Extract response text for validation
         resp_text = result.get("response") if isinstance(result, dict) else str(result)
@@ -863,9 +893,21 @@ async def stream_message(message: str, conversation_id: Optional[str] = None, us
         secondary = ", ".join(analysis["secondary_intents"])
         prompt = f"{prompt}\n\n[Multi-domain: primary {intent}, also {secondary}]"
     full_response = []
-    async for chunk in generate_response_stream(prompt, system_prompt=system_prompt):
-        full_response.append(chunk)
-        yield {"type": "chunk", "content": chunk}
+    try:
+        async for chunk in generate_response_stream(prompt, system_prompt=system_prompt):
+            full_response.append(chunk)
+            yield {"type": "chunk", "content": chunk}
+    except OllamaError as e:
+        logger.warning(f"Stream LLM unavailable: {e.message}")
+        fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
+        # Yield fallback as single chunk so frontend receives usable content instead of error only
+        yield {"type": "chunk", "content": fallback}
+        full_response = [fallback]
+    except Exception as e:
+        logger.warning(f"Stream unexpected error: {e}")
+        fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
+        yield {"type": "chunk", "content": fallback}
+        full_response = [fallback]
     # After streaming complete, validate and add assistant to memory (sanitized, capped) — Phase 7
     if full_response:
         raw_final = "".join(full_response)

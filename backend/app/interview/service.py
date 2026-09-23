@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "interviews.db")
@@ -61,7 +61,7 @@ def _row_to_dict(row) -> Dict:
 
 def create_interview(data: dict) -> Dict:
     interview_id = uuid.uuid4().hex[:12]
-    created_at = datetime.utcnow().isoformat() + "Z"
+    created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
