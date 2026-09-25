@@ -1,10 +1,40 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { checkBackendHealth, sendChatMessage, sendChatMessageStream } from './api'
 import { InterviewSchedule, InterviewScheduledCard, InterviewLobby, InterviewList } from './InterviewViews'
 import { InterviewSession } from './InterviewSession'
 import { useChatVoice } from './useChatVoice'
 import './App.css'
+
+const STORAGE_KEY = 'ard_conversations'
+const CURRENT_CONV_KEY = 'ard_conversation_id'
+
+function loadConversations() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return []
+}
+
+function saveConversations(conversations) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
+  } catch {}
+}
+
+function generateId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
+function getConversationTitle(messages) {
+  const firstUserMsg = messages.find(m => m.role === 'user')
+  if (!firstUserMsg) return 'New conversation'
+  const text = firstUserMsg.content.trim()
+  return text.length > 50 ? text.slice(0, 50) + '…' : text
+}
 
 const suggestions = [
   { label: 'Career planning', prompt: 'Help me plan my career growth for the next 2 years' },
@@ -80,7 +110,14 @@ function IconPlus(props) {
 
 function App() {
   const [status, setStatus] = useState('checking')
-  const [messages, setMessages] = useState([])
+  const [conversations, setConversations] = useState(() => loadConversations())
+  const [currentConversationId, setCurrentConversationId] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CURRENT_CONV_KEY)
+      if (stored) return stored
+    } catch {}
+    return null
+  })
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -91,19 +128,18 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [autoSpeak, setAutoSpeak] = useState(true)
   const voice = useChatVoice()
-  const [conversationId, setConversationId] = useState(() => {
-    try {
-      const stored = localStorage.getItem('ard_conversation_id')
-      if (stored) return stored
-    } catch {}
-    const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
-    try { localStorage.setItem('ard_conversation_id', id) } catch {}
-    return id
-  })
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const [voiceBase, setVoiceBase] = useState('')
   const ttsBufferRef = useRef('')
+  const conversationsRef = useRef(conversations)
+
+  useEffect(() => {
+    conversationsRef.current = conversations
+  }, [conversations])
+
+  const currentConversation = conversations.find(c => c.id === currentConversationId)
+  const messages = currentConversation?.messages || []
 
   useEffect(() => {
     let mounted = true
@@ -127,6 +163,23 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    if (conversations.length > 0) {
+      saveConversations(conversations)
+    }
+  }, [conversations])
+
+  const updateCurrentConversation = useCallback((updater, convId) => {
+    const targetId = convId ?? currentConversationId
+    setConversations(prev => {
+      const idx = prev.findIndex(c => c.id === targetId)
+      if (idx === -1) return prev
+      const updated = [...prev]
+      updated[idx] = { ...updated[idx], ...updater(updated[idx]), updatedAt: Date.now() }
+      return updated
+    })
+  }, [currentConversationId])
+
   // Chat voice: handle final transcript -> input, preserve typed text
   useEffect(() => {
     voice.setOnFinal((finalText) => {
@@ -147,31 +200,61 @@ function App() {
     const message = text.trim()
     if (!message || isLoading) return
 
+    let activeConvId = currentConversationId
+
+    // Ensure we have a current conversation - create one if needed
+    if (!activeConvId) {
+      activeConvId = generateId()
+      setCurrentConversationId(activeConvId)
+      try { localStorage.setItem(CURRENT_CONV_KEY, activeConvId) } catch {}
+    }
+
+    // Ensure conversation exists in the list (for new chats that haven't sent a message yet)
+    const convExists = conversationsRef.current.some(c => c.id === activeConvId)
+    if (!convExists) {
+      const newConv = { id: activeConvId, messages: [], createdAt: Date.now(), updatedAt: Date.now() }
+      setConversations(prev => [...prev, newConv])
+    }
+
     // Prevent overlapping speech: cancel any ongoing TTS before new turn and reset streaming buffer
     ttsBufferRef.current = ''
     if (voice.isSpeaking) voice.cancelSpeak()
     if (voice.isListening) voice.stopListening()
 
-    setMessages((prev) => [...prev, { role: 'user', content: message }])
+    // Add user message to current conversation
+    const userMsg = { role: 'user', content: message }
+    updateCurrentConversation(conv => ({
+      ...conv,
+      messages: [...conv.messages, userMsg]
+    }), activeConvId)
     setIsLoading(true)
     setError(null)
 
-    const assistantIdxRef = { current: null }
     let streamContent = ''
     let streamIntent = null
     let streamAgent = null
     let gotChunk = false
 
-    setMessages((prev) => {
-      assistantIdxRef.current = prev.length
-      return [...prev, { role: 'assistant', content: '', model: 'qwen2.5:3b', intent: null, agent: null, streaming: true }]
-    })
+    // Add placeholder assistant message
+    updateCurrentConversation(conv => {
+      const assistantMsg = { role: 'assistant', content: '', model: 'qwen2.5:3b', intent: null, agent: null, streaming: true }
+      return { ...conv, messages: [...conv.messages, assistantMsg] }
+    }, activeConvId)
 
+    // Find the streaming assistant message by looking for the last assistant message with streaming=true
     const updateAssistant = (content, intent, agent, streaming) => {
-      setMessages((prev) => {
-        const idx = assistantIdxRef.current
-        if (idx === null || idx >= prev.length) return prev
-        const updated = [...prev]
+      updateCurrentConversation(conv => {
+        const messages = conv.messages
+        // Find the last assistant message that is streaming (or the last assistant message if not streaming anymore)
+        let idx = -1
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'assistant' && (streaming || messages[i].streaming)) {
+            idx = i
+            break
+          }
+        }
+        if (idx === -1) return conv
+        const updated = [...messages]
         updated[idx] = {
           ...updated[idx],
           content,
@@ -179,8 +262,8 @@ function App() {
           agent: agent !== undefined ? agent : updated[idx].agent,
           streaming,
         }
-        return updated
-      })
+        return { ...conv, messages: updated }
+      }, activeConvId)
     }
 
     // Streaming TTS helpers: split buffer into complete sentences/phrases for natural speech
@@ -216,9 +299,10 @@ function App() {
         onMeta: (meta) => {
           streamIntent = meta.intent
           streamAgent = meta.agent
-          if (meta.conversation_id && meta.conversation_id !== conversationId) {
-            setConversationId(meta.conversation_id)
-            try { localStorage.setItem('ard_conversation_id', meta.conversation_id) } catch {}
+          if (meta.conversation_id && meta.conversation_id !== activeConvId) {
+            activeConvId = meta.conversation_id
+            setCurrentConversationId(meta.conversation_id)
+            try { localStorage.setItem(CURRENT_CONV_KEY, meta.conversation_id) } catch {}
           }
           updateAssistant(streamContent, streamIntent, streamAgent, true)
         },
@@ -240,13 +324,14 @@ function App() {
         onError: (detail) => {
           throw new Error(detail)
         },
-        conversationId,
+        conversationId: activeConvId,
       })
       if (!gotChunk) {
-        const data = await sendChatMessage(message, conversationId)
-        if (data.conversation_id && data.conversation_id !== conversationId) {
-          setConversationId(data.conversation_id)
-          try { localStorage.setItem('ard_conversation_id', data.conversation_id) } catch {}
+        const data = await sendChatMessage(message, activeConvId)
+        if (data.conversation_id && data.conversation_id !== activeConvId) {
+          activeConvId = data.conversation_id
+          setCurrentConversationId(data.conversation_id)
+          try { localStorage.setItem(CURRENT_CONV_KEY, data.conversation_id) } catch {}
         }
         updateAssistant(data.response, data.intent, data.agent, false)
         if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
@@ -266,33 +351,58 @@ function App() {
           }
         }
       }
+      // Update conversation title after first exchange
+      updateCurrentConversation(conv => {
+        if (conv.title) return conv
+        return { ...conv, title: getConversationTitle(conv.messages) }
+      }, activeConvId)
     } catch (err) {
       // On streaming error, cancel pending TTS and clear buffer to avoid stale speech
       ttsBufferRef.current = ''
       if (voice.isSpeaking) voice.cancelSpeak()
       if (!gotChunk) {
         try {
-          const data = await sendChatMessage(message, conversationId)
-          if (data.conversation_id && data.conversation_id !== conversationId) {
-            setConversationId(data.conversation_id)
-            try { localStorage.setItem('ard_conversation_id', data.conversation_id) } catch {}
+          const data = await sendChatMessage(message, activeConvId)
+          if (data.conversation_id && data.conversation_id !== activeConvId) {
+            activeConvId = data.conversation_id
+            setCurrentConversationId(data.conversation_id)
+            try { localStorage.setItem(CURRENT_CONV_KEY, data.conversation_id) } catch {}
           }
           updateAssistant(data.response, data.intent, data.agent, false)
           if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
             voice.queueSpeak(data.response)
           }
+          updateCurrentConversation(conv => {
+            if (conv.title) return conv
+            return { ...conv, title: getConversationTitle(conv.messages) }
+          }, activeConvId)
         } catch (fallbackErr) {
           setError(fallbackErr.message)
           updateAssistant(`Error: ${fallbackErr.message}`, null, null, false)
-          setMessages((prev) => {
-            const idx = assistantIdxRef.current
-            if (idx !== null && prev[idx]) prev[idx].isError = true
-            return [...prev]
-          })
+          updateCurrentConversation(conv => {
+            const messages = conv.messages
+            let idx = -1
+            for (let i = messages.length - 1; i >= 0; i--) {
+              if (messages[i].role === 'assistant') {
+                idx = i
+                break
+              }
+            }
+            if (idx !== -1) {
+              const updated = [...messages]
+              updated[idx] = { ...updated[idx], isError: true }
+              return { ...conv, messages: updated }
+            }
+            return conv
+          }, activeConvId)
         }
       } else {
         setError(err.message)
         updateAssistant(streamContent + `\n\nError: ${err.message}`, streamIntent, streamAgent, false)
+        updateCurrentConversation(conv => {
+          if (conv.title) return conv
+          return { ...conv, title: getConversationTitle(conv.messages) }
+        }, activeConvId)
       }
     } finally {
       setIsLoading(false)
@@ -352,13 +462,25 @@ function App() {
     if (voice.isListening) voice.stopListening()
     if (voice.isSpeaking) voice.cancelSpeak()
     ttsBufferRef.current = ''
-    setMessages([])
     setError(null)
     setInputValue('')
     setVoiceBase('')
-    const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
-    setConversationId(id)
-    try { localStorage.setItem('ard_conversation_id', id) } catch {}
+    const id = generateId()
+    setCurrentConversationId(id)
+    try { localStorage.setItem(CURRENT_CONV_KEY, id) } catch {}
+    setInterviewView('chat')
+    setSidebarOpen(false)
+  }
+
+  const switchConversation = (id) => {
+    if (voice.isListening) voice.stopListening()
+    if (voice.isSpeaking) voice.cancelSpeak()
+    ttsBufferRef.current = ''
+    setError(null)
+    setInputValue('')
+    setVoiceBase('')
+    setCurrentConversationId(id)
+    try { localStorage.setItem(CURRENT_CONV_KEY, id) } catch {}
     setInterviewView('chat')
     setSidebarOpen(false)
   }
@@ -405,16 +527,24 @@ function App() {
 
           <div className="sidebar-section">
             <div className="sidebar-label">Recent</div>
-            {messages.length === 0 ? (
+            {conversations.length === 0 ? (
               <div className="recent-empty">No conversations yet</div>
             ) : (
               <div className="recent-list">
-                {messages.filter(m => m.role === 'user').slice(-4).reverse().map((m, i) => (
-                  <div key={i} className="recent-item" title={m.content}>
-                    <IconChat />
-                    <span>{m.content.slice(0, 38)}{m.content.length > 38 ? '…' : ''}</span>
-                  </div>
-                ))}
+                {conversations
+                  .slice()
+                  .sort((a, b) => b.updatedAt - a.updatedAt)
+                  .map((conv) => (
+                    <button
+                      key={conv.id}
+                      className={`recent-item ${currentConversationId === conv.id ? 'active' : ''}`}
+                      onClick={() => switchConversation(conv.id)}
+                      title={conv.title || 'New conversation'}
+                    >
+                      <IconChat />
+                      <span>{conv.title || 'New conversation'}</span>
+                    </button>
+                  ))}
               </div>
             )}
           </div>
