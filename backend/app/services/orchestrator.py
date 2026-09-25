@@ -80,6 +80,31 @@ _STANDALONE_GREETING_RE = re.compile(
 )
 _STANDALONE_SMALLTALK = {"thanks", "thank you", "thank you!", "thanks!", "bye", "goodbye", "good night", "good night!", "thank you so much"}
 
+# Greeting bases that can have repeated trailing characters normalized
+_GREETING_BASES = {"hi", "hello", "hey"}
+
+def _normalize_greeting(msg: str) -> str:
+    """Normalize repeated trailing characters for known greeting bases only.
+    
+    E.g., "hii" -> "hi", "hiii" -> "hi", "helloo" -> "hello", "heyy" -> "hey".
+    Does not affect non-greeting words or internal repeated characters.
+    """
+    lower = msg.lower().strip()
+    if not lower:
+        return lower
+    # Strip trailing punctuation/spaces first
+    stripped = re.sub(r"[!.,\s]+$", "", lower)
+    # Check if stripped starts with a known greeting base followed by repeated last char
+    for base in _GREETING_BASES:
+        if stripped == base:
+            return base
+        if stripped.startswith(base) and len(stripped) > len(base):
+            # Check if the rest is just repetition of the last character of base
+            suffix = stripped[len(base):]
+            if suffix and all(ch == base[-1] for ch in suffix):
+                return base
+    return stripped
+
 
 def _is_standalone_greeting_or_smalltalk(msg: str) -> bool:
     lower = msg.lower().strip()
@@ -92,6 +117,10 @@ def _is_standalone_greeting_or_smalltalk(msg: str) -> bool:
     # Common greeting with punctuation variations e.g. "hello!", "hi."
     stripped = re.sub(r"[!.,\s]+$", "", lower)
     if stripped in {"hello", "hi", "hey", "howdy", "greetings", "good morning", "good afternoon", "good evening", "good night"}:
+        return True
+    # Normalize repeated trailing characters for greeting bases
+    normalized = _normalize_greeting(lower)
+    if normalized in {"hello", "hi", "hey", "howdy", "greetings", "good morning", "good afternoon", "good evening", "good night"}:
         return True
     return False
 
@@ -138,11 +167,13 @@ def _get_deterministic_smalltalk_response(message: str) -> Optional[str]:
         return None
     # Normalize: strip trailing punctuation/spaces for map lookup
     stripped = re.sub(r"[!.,\s]+$", "", lower).strip()
+    # Normalize repeated trailing characters for greeting bases (hi->hii, hello->helloo, hey->heyy)
+    normalized = _normalize_greeting(lower)
     # Direct map
-    if stripped in _DETERMINISTIC_SMALLTALK_MAP:
-        return _DETERMINISTIC_SMALLTALK_MAP[stripped]
+    if normalized in _DETERMINISTIC_SMALLTALK_MAP:
+        return _DETERMINISTIC_SMALLTALK_MAP[normalized]
     # Also handle "hi there", "hello there"
-    if stripped in {"hi there", "hello there", "hey there"}:
+    if normalized in {"hi there", "hello there", "hey there"}:
         return "Hello! How can I help you today?"
     # Regex fallback for variants with punctuation already stripped
     if _DETERMINISTIC_SMALLTALK_RE.match(lower):

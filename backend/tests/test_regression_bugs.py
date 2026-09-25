@@ -299,3 +299,62 @@ def test_stream_deterministic_hello():
             assert events[1]["content"] == "Hello! How can I help you today?"
             assert not mock_stream.called
     asyncio.run(run())
+
+
+# ---- Regression tests for repeated-letter greeting variants ----
+
+def test_deterministic_repeated_letter_greetings():
+    """hi/hii/hiii, hello/helloo, hey/heyy all deterministic small-talk."""
+    from app.services.orchestrator import _get_deterministic_smalltalk_response, _is_standalone_greeting_or_smalltalk
+    for msg in ["hi", "hii", "hiii", "hiiii"]:
+        assert _get_deterministic_smalltalk_response(msg) == "Hi! How can I help you today?", f"Failed for {msg}"
+        assert _is_standalone_greeting_or_smalltalk(msg), f"Failed standalone for {msg}"
+    for msg in ["hello", "helloo", "hellooo"]:
+        assert _get_deterministic_smalltalk_response(msg) == "Hello! How can I help you today?", f"Failed for {msg}"
+        assert _is_standalone_greeting_or_smalltalk(msg), f"Failed standalone for {msg}"
+    for msg in ["hey", "heyy", "heyyy"]:
+        assert _get_deterministic_smalltalk_response(msg) == "Hey! How can I help you today?", f"Failed for {msg}"
+        assert _is_standalone_greeting_or_smalltalk(msg), f"Failed standalone for {msg}"
+
+
+def test_route_message_repeated_letter_greetings():
+    """route_message handles repeated-letter greetings deterministically (0 LLM calls)."""
+    cm.clear_all()
+    _last_intent.clear()
+    async def run():
+        cases = [
+            ("hii", "Hi! How can I help you today?"),
+            ("hiii", "Hi! How can I help you today?"),
+            ("helloo", "Hello! How can I help you today?"),
+            ("heyy", "Hey! How can I help you today?"),
+        ]
+        for msg, expected in cases:
+            with patch("app.services.orchestrator.generate_response", new=AsyncMock(return_value=mock_resp("SHOULD NOT BE CALLED"))) as m:
+                r = await route_message(msg, conversation_id=f"fresh-{msg}")
+                assert r["intent"] == "general", msg
+                assert r["response"] == expected, msg
+                assert not m.called, msg
+                assert r["rag_used"] is False, msg
+                assert "career" not in r["response"].lower(), msg
+    asyncio.run(run())
+
+
+def test_repeated_letter_not_over_normalized():
+    """Words that are NOT greetings should not be normalized to greetings."""
+    from app.services.orchestrator import _normalize_greeting, _get_deterministic_smalltalk_response
+    # These should NOT become greetings
+    non_greetings = [
+        "hiking",    # starts with hi but not just hi+repeated
+        "history",   # starts with hi but not just hi+repeated
+        "helloworld", # starts with hello but not just hello+repeated
+        "heythere",  # starts with hey but not just hey+repeated
+        "hiya",      # hi+ya not just hi+i...
+        "hiss",      # hi+ss not just hi+i...
+        "hell",      # prefix of hello but not hello
+        "he",        # prefix of hey
+    ]
+    for msg in non_greetings:
+        normalized = _normalize_greeting(msg)
+        assert normalized == msg.lower().strip(), f"Over-normalized: {msg} -> {normalized}"
+        # Should not get deterministic response
+        assert _get_deterministic_smalltalk_response(msg) is None, f"False positive for {msg}"
