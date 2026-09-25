@@ -73,6 +73,87 @@ ROUTING_REASONS = {
 # Intent priority for tie-breaking (higher = earlier)
 INTENT_PRIORITY = ["recruitment", "resume", "interview", "learning", "career", "business", "general"]
 
+# Standalone greetings/smalltalk that must NOT inherit stale context (Bug 1 fix)
+_STANDALONE_GREETING_RE = re.compile(
+    r"^\s*(hello|hi|hey|howdy|greetings?|good\s*(morning|afternoon|evening|night)|hola|hello there|hi there|hey there)\s*[!.,]*\s*$",
+    re.IGNORECASE,
+)
+_STANDALONE_SMALLTALK = {"thanks", "thank you", "thank you!", "thanks!", "bye", "goodbye", "good night", "good night!", "thank you so much"}
+
+
+def _is_standalone_greeting_or_smalltalk(msg: str) -> bool:
+    lower = msg.lower().strip()
+    if not lower:
+        return False
+    if _STANDALONE_GREETING_RE.match(lower):
+        return True
+    if lower in _STANDALONE_SMALLTALK:
+        return True
+    # Common greeting with punctuation variations e.g. "hello!", "hi."
+    stripped = re.sub(r"[!.,\s]+$", "", lower)
+    if stripped in {"hello", "hi", "hey", "howdy", "greetings", "good morning", "good afternoon", "good evening", "good night"}:
+        return True
+    return False
+
+
+# Deterministic small-talk handling (Part 4: avoid LLM for simple greetings)
+# Keep responses concise 1-2 sentences, no career injection
+_DETERMINISTIC_SMALLTALK_MAP = {
+    "hello": "Hello! How can I help you today?",
+    "hi": "Hi! How can I help you today?",
+    "hey": "Hey! How can I help you today?",
+    "howdy": "Hello! How can I help you today?",
+    "greetings": "Hello! How can I help you today?",
+    "good morning": "Good morning! How can I help you today?",
+    "good afternoon": "Good afternoon! How can I help you today?",
+    "good evening": "Good evening! How can I help you today?",
+    "good night": "Good night! How can I help you?",
+    "thanks": "You're welcome! How can I help you today?",
+    "thank you": "You're welcome! How can I help you today?",
+    "thank you so much": "You're welcome! How can I help you today?",
+    "okay": "Got it! How can I help you today?",
+    "ok": "Got it! How can I help you today?",
+    "no": "Okay. Let me know how I can help you.",
+    "bye": "Goodbye! Let me know if you need anything.",
+    "goodbye": "Goodbye! Let me know if you need anything.",
+}
+# Include punctuation variants
+_DETERMINISTIC_SMALLTALK_RE = re.compile(
+    r"^\s*(hello|hi|hey|howdy|greetings?|good\s*(morning|afternoon|evening|night)|thanks|thank you|thank you so much|okay|ok|no|bye|goodbye)\s*[!.,]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _get_deterministic_smalltalk_response(message: str) -> Optional[str]:
+    """Return deterministic response for obvious small-talk, else None.
+
+    Covers fresh greeting/small-talk and also previous-topic + small-talk (no/thanks/okay)
+    to prevent stale context injection via prompt history.
+    Must NOT match contextual phrases like 'Explain it with an example.'
+    """
+    if not message or not isinstance(message, str):
+        return None
+    lower = message.lower().strip()
+    if not lower:
+        return None
+    # Normalize: strip trailing punctuation/spaces for map lookup
+    stripped = re.sub(r"[!.,\s]+$", "", lower).strip()
+    # Direct map
+    if stripped in _DETERMINISTIC_SMALLTALK_MAP:
+        return _DETERMINISTIC_SMALLTALK_MAP[stripped]
+    # Also handle "hi there", "hello there"
+    if stripped in {"hi there", "hello there", "hey there"}:
+        return "Hello! How can I help you today?"
+    # Regex fallback for variants with punctuation already stripped
+    if _DETERMINISTIC_SMALLTALK_RE.match(lower):
+        # Extract base without punctuation
+        base = re.sub(r"[!.,\s]+$", "", lower).strip()
+        if base in _DETERMINISTIC_SMALLTALK_MAP:
+            return _DETERMINISTIC_SMALLTALK_MAP[base]
+        if base in {"hi there", "hello there"}:
+            return "Hello! How can I help you today?"
+    return None
+
 
 def _load_agent(name: str):
     if name == "career":
@@ -390,15 +471,23 @@ def _detect_with_context(message: str, history: List[Dict[str, str]], conversati
     if not last_intent or last_intent == "general":
         return base
     lower = message.lower().strip()
+    # Bug 1 fix: standalone greetings/smalltalk must never inherit stale intent
+    if _is_standalone_greeting_or_smalltalk(lower):
+        return base
     # follow-up cues (expanded for Phase 3)
     followup_cues = [
         "what should", "what about", "how about", "tell me more", "which", "skills", "first", "next",
-        "it ", "that ", "learn", "become", "roadmap", "course", "prepare", "screening", "them"
+        "it", "that", "learn", "become", "roadmap", "course", "prepare", "screening", "them",
+        "this", "these", "those", "more", "example", "explain"
     ]
-    is_short = len(lower.split()) <= 9
     has_cue = any(cue in lower for cue in followup_cues)
-    # If message is short or has cue, reuse last intent for contextual follow-up
-    if is_short or has_cue:
+    # Also check pronoun word-boundary for 'it'/'that' without trailing space
+    if not has_cue:
+        if re.search(r"\b(it|that|this|these|those|them)\b", lower):
+            has_cue = True
+    # Bug 1 fix: only reuse last intent when message is genuinely contextual (has cue)
+    # Previous `is_short or has_cue` incorrectly treated "hello" (1 word) as contextual
+    if has_cue:
         # Special mapping: if last was career and now asks about learning, prefer learning
         if last_intent == "career" and any(k in lower for k in ["learn", "skill", "course", "roadmap", "education"]):
             return "learning"
@@ -656,6 +745,36 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
     # Add user message to memory (bounded)
     conv_mem.add_message(cid, "user", message)
 
+    # Deterministic small-talk bypass (fix irrelevant career responses & latency)
+    deterministic = _get_deterministic_smalltalk_response(message)
+    if deterministic is not None:
+        intent = "general"
+        analysis["primary"] = "general"
+        analysis["reason"] = (analysis.get("reason") or "") + " + deterministic small-talk"
+        routing_reason = _get_routing_reason(intent, analysis) + " (deterministic small-talk)"
+        sanitized = _sanitize_response(deterministic)
+        result = {
+            "response": sanitized,
+            "intent": intent,
+            "agent": None,
+            "routing_reason": routing_reason,
+            "conversation_id": cid,
+            "confidence": "high",
+            "is_ambiguous": False,
+            "is_multi_domain": False,
+            "secondary_intents": [],
+            "all_scores": analysis.get("all_scores", {}),
+            "rag_used": False,
+            "rag_sources": [],
+            "rag_count": 0,
+            "validation_issues": [],
+            "validation_passed": True,
+            "validation_latency_ms": 0,
+        }
+        conv_mem.add_message(cid, "assistant", sanitized)
+        _last_intent[cid] = intent
+        return result
+
     context = conv_mem.build_context(history_before)
 
     routing_reason = _get_routing_reason(intent, analysis)
@@ -873,6 +992,28 @@ async def stream_message(message: str, conversation_id: Optional[str] = None, us
     # Add user message
     conv_mem.add_message(cid, "user", message)
     _last_intent[cid] = intent
+
+    # Deterministic small-talk bypass for streaming (mirrors route_message)
+    deterministic = _get_deterministic_smalltalk_response(message)
+    if deterministic is not None:
+        intent = "general"
+        agent = None
+        analysis["primary"] = "general"
+        analysis["reason"] = (analysis.get("reason") or "") + " + deterministic small-talk"
+        routing_reason = _get_routing_reason(intent, analysis) + " (deterministic small-talk)"
+        rag_used = False
+        rag_sources = []
+        rag_results = []
+        rag_count = 0
+        _last_intent[cid] = intent
+        sanitized = _sanitize_response(deterministic)
+        yield {"type": "meta", "intent": intent, "agent": agent, "routing_reason": routing_reason, "conversation_id": cid,
+               "confidence": "high", "is_ambiguous": False,
+               "is_multi_domain": False, "secondary_intents": [],
+               "rag_used": False, "rag_sources": [], "rag_count": 0}
+        yield {"type": "chunk", "content": sanitized}
+        conv_mem.add_message(cid, "assistant", sanitized)
+        return
 
     # Yield metadata first so frontend can show intent immediately (include RAG info)
     yield {"type": "meta", "intent": intent, "agent": agent, "routing_reason": routing_reason, "conversation_id": cid,

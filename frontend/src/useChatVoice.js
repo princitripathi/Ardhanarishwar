@@ -25,17 +25,86 @@ export function useChatVoice() {
   const listeningIntent = useRef(false)
   const baseRef = useRef('')
 
+  // TTS queue for streaming incremental speech
+  const speakQueueRef = useRef([])
+  const isSpeakingRef = useRef(false)
+  const playNextRef = useRef(null)
+
   const cancelSpeak = useCallback(() => {
+    // Clear queued utterances and stop current
+    speakQueueRef.current = []
+    isSpeakingRef.current = false
     if (ttsSupported && typeof window !== 'undefined') {
       try { window.speechSynthesis.cancel() } catch {}
     }
     setIsSpeaking(false)
   }, [ttsSupported])
 
+  const _playNext = useCallback(() => {
+    if (!ttsSupported || typeof window === 'undefined') return
+    if (isSpeakingRef.current) return
+    const next = speakQueueRef.current.shift()
+    if (!next) {
+      setIsSpeaking(false)
+      isSpeakingRef.current = false
+      return
+    }
+    const clean = next.trim().slice(0, 900)
+    const plain = clean.replace(/[#*_`[\]]/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!plain) {
+      // Skip empty and try next
+      setTimeout(() => playNextRef.current?.(), 0)
+      return
+    }
+    const utter = new SpeechSynthesisUtterance(plain)
+    utter.lang = 'en-US'
+    utter.rate = 1
+    isSpeakingRef.current = true
+    setIsSpeaking(true)
+    utter.onstart = () => {
+      isSpeakingRef.current = true
+      setIsSpeaking(true)
+    }
+    utter.onend = () => {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+      // Small delay to let next queued speak
+      setTimeout(() => playNextRef.current?.(), 30)
+    }
+    utter.onerror = () => {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+      setTimeout(() => playNextRef.current?.(), 30)
+    }
+    try { window.speechSynthesis.speak(utter) } catch {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+      setTimeout(() => playNextRef.current?.(), 30)
+    }
+  }, [ttsSupported])
+
+  // Keep ref updated for recursive calls
+  useEffect(() => { playNextRef.current = _playNext }, [_playNext])
+
+  const queueSpeak = useCallback((text) => {
+    if (!ttsSupported || !text || !text.trim()) return
+    const clean = text.trim()
+    if (!clean) return
+    speakQueueRef.current.push(clean)
+    // If not currently speaking, start playback
+    if (!isSpeakingRef.current) {
+      // Use ref to avoid stale closure
+      if (playNextRef.current) playNextRef.current()
+      else _playNext()
+    }
+  }, [ttsSupported, _playNext])
+
   const speak = useCallback((text) => {
     if (!ttsSupported || !text || !text.trim()) return
-    // Prevent overlapping speech: cancel previous
+    // For non-streaming fallback, use queue path to avoid overlap: cancel then queue single
     try { window.speechSynthesis.cancel() } catch {}
+    speakQueueRef.current = []
+    isSpeakingRef.current = false
     const clean = text.trim().slice(0, 900)
     // Strip markdown-ish artifacts for more natural speech
     const plain = clean.replace(/[#*_`[\]]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -43,11 +112,27 @@ export function useChatVoice() {
     const utter = new SpeechSynthesisUtterance(plain)
     utter.lang = 'en-US'
     utter.rate = 1
-    utter.onstart = () => setIsSpeaking(true)
-    utter.onend = () => setIsSpeaking(false)
-    utter.onerror = () => setIsSpeaking(false)
-    try { window.speechSynthesis.speak(utter) } catch { setIsSpeaking(false) }
-  }, [ttsSupported])
+    utter.onstart = () => {
+      isSpeakingRef.current = true
+      setIsSpeaking(true)
+    }
+    utter.onend = () => {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+      // If queued items remain (fallback queue), play next
+      if (speakQueueRef.current.length > 0) _playNext()
+    }
+    utter.onerror = () => {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+    }
+    isSpeakingRef.current = true
+    setIsSpeaking(true)
+    try { window.speechSynthesis.speak(utter) } catch {
+      isSpeakingRef.current = false
+      setIsSpeaking(false)
+    }
+  }, [ttsSupported, _playNext])
 
   const stopListening = useCallback(() => {
     listeningIntent.current = false
@@ -185,6 +270,7 @@ export function useChatVoice() {
     startListening,
     stopListening,
     speak,
+    queueSpeak,
     cancelSpeak,
     setOnFinal,
     clearError: () => setError(null)

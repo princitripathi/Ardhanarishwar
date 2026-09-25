@@ -103,6 +103,7 @@ function App() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const [voiceBase, setVoiceBase] = useState('')
+  const ttsBufferRef = useRef('')
 
   useEffect(() => {
     let mounted = true
@@ -146,7 +147,8 @@ function App() {
     const message = text.trim()
     if (!message || isLoading) return
 
-    // Prevent overlapping speech: cancel any ongoing TTS before new turn
+    // Prevent overlapping speech: cancel any ongoing TTS before new turn and reset streaming buffer
+    ttsBufferRef.current = ''
     if (voice.isSpeaking) voice.cancelSpeak()
     if (voice.isListening) voice.stopListening()
 
@@ -181,6 +183,34 @@ function App() {
       })
     }
 
+    // Streaming TTS helpers: split buffer into complete sentences/phrases for natural speech
+    const extractComplete = (buffer) => {
+      if (!buffer || !buffer.trim()) return { sentences: [], remainder: buffer }
+      const sentences = []
+      // Capture sentences ending with .!? or newline
+      const re = /[^.!?\n]+[.!?]+(?:\s+|$)|[^\n]+\n+/g
+      let lastIndex = 0
+      let m
+      while ((m = re.exec(buffer)) !== null) {
+        const s = m[0].trim()
+        if (s) sentences.push(s)
+        lastIndex = re.lastIndex
+      }
+      let remainder = buffer.slice(lastIndex)
+      // Fallback: if no complete sentence but buffer is long, split on last space to avoid indefinite buffering
+      if (sentences.length === 0 && remainder.trim().length > 140) {
+        const lastSpace = remainder.lastIndexOf(' ')
+        if (lastSpace > 80) {
+          const chunk = remainder.slice(0, lastSpace).trim()
+          if (chunk) sentences.push(chunk)
+          remainder = remainder.slice(lastSpace + 1)
+        }
+      }
+      return { sentences, remainder }
+    }
+
+    const shouldStreamSpeak = autoSpeak && voice.ttsSupported
+
     try {
       await sendChatMessageStream(message, {
         onMeta: (meta) => {
@@ -197,6 +227,15 @@ function App() {
           streamContent += chunk
           if (gotChunk) setIsLoading(false)
           updateAssistant(streamContent, streamIntent, streamAgent, true)
+          // Streaming TTS: enqueue complete sentences as they become available, don't wait for full response
+          if (shouldStreamSpeak && chunk && !chunk.startsWith('Error:')) {
+            ttsBufferRef.current += chunk
+            const { sentences, remainder } = extractComplete(ttsBufferRef.current)
+            if (sentences.length > 0) {
+              ttsBufferRef.current = remainder
+              sentences.forEach((s) => voice.queueSpeak(s))
+            }
+          }
         },
         onError: (detail) => {
           throw new Error(detail)
@@ -210,17 +249,27 @@ function App() {
           try { localStorage.setItem('ard_conversation_id', data.conversation_id) } catch {}
         }
         updateAssistant(data.response, data.intent, data.agent, false)
-        if (autoSpeak && voice.ttsSupported && data.response && !data.response.startsWith('Error:')) {
-          voice.speak(data.response)
+        if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
+          // For non-stream fallback, queue single utterance via streaming queue to keep behavior consistent
+          ttsBufferRef.current = ''
+          voice.queueSpeak(data.response)
         }
       } else {
         const finalStream = streamContent || '(no response)'
         updateAssistant(finalStream, streamIntent, streamAgent, false)
-        if (autoSpeak && voice.ttsSupported && finalStream && !finalStream.startsWith('Error:')) {
-          voice.speak(finalStream)
+        // Flush any remaining buffered text after stream completion; do NOT re-speak entire finalStream (prevents duplicate)
+        if (shouldStreamSpeak && ttsBufferRef.current.trim()) {
+          const remaining = ttsBufferRef.current.trim()
+          ttsBufferRef.current = ''
+          if (remaining && !remaining.startsWith('Error:')) {
+            voice.queueSpeak(remaining)
+          }
         }
       }
     } catch (err) {
+      // On streaming error, cancel pending TTS and clear buffer to avoid stale speech
+      ttsBufferRef.current = ''
+      if (voice.isSpeaking) voice.cancelSpeak()
       if (!gotChunk) {
         try {
           const data = await sendChatMessage(message, conversationId)
@@ -229,6 +278,9 @@ function App() {
             try { localStorage.setItem('ard_conversation_id', data.conversation_id) } catch {}
           }
           updateAssistant(data.response, data.intent, data.agent, false)
+          if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
+            voice.queueSpeak(data.response)
+          }
         } catch (fallbackErr) {
           setError(fallbackErr.message)
           updateAssistant(`Error: ${fallbackErr.message}`, null, null, false)
@@ -251,7 +303,10 @@ function App() {
   const handleSend = async (e) => {
     e.preventDefault()
     if (voice.isListening) voice.stopListening()
-    if (voice.isSpeaking) voice.cancelSpeak()
+    if (voice.isSpeaking) {
+      voice.cancelSpeak()
+      ttsBufferRef.current = ''
+    }
     const text = voice.isListening ? (voiceBase || inputValue) : inputValue
     const finalText = text.trim()
     if (!finalText) return
@@ -273,7 +328,10 @@ function App() {
   const handleInputChange = (e) => {
     setInputValue(e.target.value)
     // If user types while speaking, cancel speech to prevent overlap
-    if (voice.isSpeaking) voice.cancelSpeak()
+    if (voice.isSpeaking) {
+      voice.cancelSpeak()
+      ttsBufferRef.current = ''
+    }
   }
 
   // Display value: preserve typed text + interim transcript when listening
@@ -282,7 +340,10 @@ function App() {
     : inputValue
 
   const handleSuggestion = (prompt) => {
-    if (voice.isSpeaking) voice.cancelSpeak()
+    if (voice.isSpeaking) {
+      voice.cancelSpeak()
+      ttsBufferRef.current = ''
+    }
     if (voice.isListening) voice.stopListening()
     sendMessage(prompt)
   }
@@ -290,6 +351,7 @@ function App() {
   const handleNewChat = () => {
     if (voice.isListening) voice.stopListening()
     if (voice.isSpeaking) voice.cancelSpeak()
+    ttsBufferRef.current = ''
     setMessages([])
     setError(null)
     setInputValue('')
