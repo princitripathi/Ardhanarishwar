@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,7 @@ from app.interview.session_service import init_session_db
 from app.rag.routes import router as rag_router
 from app.services.memory_routes import router as memory_router
 from app.services.user_memory import init_db as init_memory_db
+from app.rag.ingestion import ingest_document
 from app.services.security import (
     get_allowed_origins,
     sanitize_for_log,
@@ -27,17 +29,56 @@ from app.services.security import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Ardhanarishwar Solver Backend")
+# Startup: ingest approved knowledge documents into local RAG
+async def _ingest_approved_knowledge():
+    try:
+        import os
+        knowledge_dir = os.path.join(os.path.dirname(__file__), "..", "data", "knowledge")
+        knowledge_dir = os.path.abspath(knowledge_dir)
+        if os.path.isdir(knowledge_dir):
+            for fname in sorted(os.listdir(knowledge_dir)):
+                if fname.lower().endswith((".md", ".txt")):
+                    fpath = os.path.join(knowledge_dir, fname)
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            text = f.read()
+                        if text.strip():
+                            doc_id = f"knowledge_{os.path.splitext(fname)[0]}"
+                            # Use store directly to avoid HTTP round-trip and rate limiting
+                            from app.rag.store import get_store
+                            store = get_store()
+                            # Check if already exists
+                            if store.get_document(doc_id) is None:
+                                ingest_document(text=text, title=fname, source=f"knowledge/{fname}", doc_id=doc_id)
+                                logger.info(f"Ingested knowledge document: {fname}")
+                    except Exception as e:
+                        logger.warning(f"Failed to ingest knowledge document {fname}: {sanitize_for_log(str(e), 200)}")
+    except Exception as e:
+        logger.warning(f"Knowledge ingestion failed: {sanitize_for_log(str(e), 300)}")
 
-# Initialize interview DB and user memory DB
-try:
-    init_interview_db()
-    init_session_db()
-    init_memory_db()
-    logger.info("Interview DB and Memory DB initialized")
-except Exception as e:
-    # Do not log raw exception with potential sensitive path info verbatim
-    logger.warning(f"DB init failed: {sanitize_for_log(str(e), 300)}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    # Initialize interview DB and user memory DB
+    try:
+        init_interview_db()
+        init_session_db()
+        init_memory_db()
+        logger.info("Interview DB and Memory DB initialized")
+    except Exception as e:
+        # Do not log raw exception with potential sensitive path info verbatim
+        logger.warning(f"DB init failed: {sanitize_for_log(str(e), 300)}")
+
+    # Ingest approved knowledge documents into local RAG
+    await _ingest_approved_knowledge()
+
+    yield
+    # Shutdown (if needed)
+    pass
+
+
+app = FastAPI(title="Ardhanarishwar Solver Backend", lifespan=lifespan)
 
 # CORS: env-configurable, tight methods/headers for internal use
 allowed_origins = get_allowed_origins()
@@ -115,6 +156,7 @@ class ChatResponse(BaseModel):
     rag_used: bool | None = None
     rag_sources: list | None = None
     rag_count: int | None = None
+    done_reason: str | None = None
 
 
 @app.get("/")
@@ -146,6 +188,7 @@ async def chat(body: ChatRequest, request: Request):
             rag_used=result.get("rag_used"),
             rag_sources=result.get("rag_sources"),
             rag_count=result.get("rag_count"),
+            done_reason=result.get("done_reason"),
         )
     except OllamaError as e:
         # Use existing error handling without exposing stack traces
@@ -166,14 +209,14 @@ async def chat_stream(body: ChatRequest, request: Request):
     async def event_generator():
         try:
             async for event in stream_message(body.message.strip(), conversation_id=body.conversation_id, user_id=body.user_id):
-                yield json.dumps(event) + "\n"
+                yield f"data: {json.dumps(event)}\n\n"
         except OllamaError as e:
-            yield json.dumps({"type": "error", "detail": e.message}) + "\n"
+            yield f"data: {json.dumps({'type': 'error', 'detail': e.message})}\n\n"
         except Exception:
             logger.exception("Unexpected error in stream endpoint")
-            yield json.dumps({"type": "error", "detail": "Internal server error"}) + "\n"
+            yield f"data: {json.dumps({'type': 'error', 'detail': 'Internal server error'})}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 app.include_router(interview_router)

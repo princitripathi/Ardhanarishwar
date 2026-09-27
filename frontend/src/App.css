@@ -152,14 +152,18 @@ html,body{height:100%}
 .recent-empty{font-size:12.5px;color:var(--text-muted);padding:4px}
 .recent-list{display:flex;flex-direction:column;gap:4px}
 .recent-item{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 8px;
-  border-radius:7px;
-  font-size:12.5px;
-  color:var(--text-secondary);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  border:1px solid transparent;
+    display:flex;align-items:center;gap:8px;
+    padding:6px 8px;
+    border-radius:7px;
+    font-size:12.5px;
+    color:var(--text-secondary);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    border:1px solid transparent;
+    background:transparent;
+    cursor:pointer;
 }
+.recent-item:hover{background:var(--surface-hover);color:var(--text)}
+.recent-item.active{background:var(--surface-card);color:var(--text);border-color:var(--border)}
 .recent-item svg{flex-shrink:0;opacity:.7}
 .sidebar-footer{margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
 .sidebar-hint{font-size:11px;color:var(--text-muted);line-height:1.4;padding:0 4px}

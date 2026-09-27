@@ -54,7 +54,7 @@ class IngestRequest(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 3
-    threshold: float = 0.12
+    threshold: float = 0.15
 
     @field_validator("query")
     @classmethod

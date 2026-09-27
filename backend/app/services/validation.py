@@ -179,8 +179,127 @@ def check_unsupported_grounded_claim(text: str, rag_used: bool, rag_results: Opt
     # If text says "According to SampleCorp ..." without retrieval
     if not rag_used and re.search(r"according to samplecorp", low):
         return "unsupported_grounded_claim:samplecorp_without_retrieval"
+    # Bare company factual claim without retrieval — detect assertions like "X is a Y", "X provides Z", "X offers..."
+    # when rag_used=False and text mentions a proper-noun-like entity
+    # Also catches "X operates under the name Y", "X is a company that..."
+    if not rag_used:
+        # Pattern 1: CapitalizedWord+ is a/an/provides/offers/has/operates... (handles periods in entity names)
+        sentence_starters = {"here", "this", "that", "it", "our", "the", "a", "an", "there", "these", "those", "what", "which", "who", "where", "when", "why", "how"}
+        bare_company_claim = re.search(
+            r"\b([A-Z][a-z]+\.?(?:[ \t]+[A-Z][a-z]+\.?){0,3})[ \t]+(?:is|provides?|offers?|operates?|runs?|manages?|owns?|serves?)[ \t]+(?:a|an|the)[ \t]+",
+            text
+        )
+        # Pattern 2: "X operates under the name" or "X is a company that..."
+        broader_fabrication = re.search(
+            r"\b([A-Z][a-z]+\.?(?:[ \t]+[A-Z][a-z]+\.?){0,3})[ \t]+(?:operates\s+under|is\s+a\s+company\s+that|is\s+a\s+leading|is\s+a\s+global)[ \t]+",
+            text
+        )
+        claim_match = bare_company_claim or broader_fabrication
+        if claim_match:
+            entity = claim_match.group(1).strip().rstrip(".")
+            # Skip common false positives (generic terms, not company names)
+            generic_terms = {
+                "company", "platform", "service", "system", "tool", "app", "website", "portal",
+                "product", "solution", "organization", "business", "enterprise", "firm",
+                "corporation", "corp", "inc", "ltd", "llc",
+                # Political offices and public roles
+                "president", "presidency", "prime minister", "governor", "senator",
+                "senate", "congressman", "congresswoman", "representative",
+                "chancellor", "secretary", "minister", "ambassador", "mayor",
+                "vice president", "lieutenant governor", "attorney general",
+                "sheriff", "commissioner", "judge", "justice", "chief justice",
+                "cabinet", "administration", "officeholder", "white house",
+                "capitol hill", "congress", "parliament", "democrat", "republican",
+                "party", "election", "ballot", "campaign", "the president",
+                "the prime minister", "the president of the", "campaign",
+                # Well-known historical and public figures (surnames only)
+                "obama", "trump", "biden", "clinton", "bush", "carter", "reagan",
+                "nixon", "kennedy", "lincoln", "washington", "roosevelt",
+                "churchill", "gandhi", "mandela", "king", "malala", "dalai",
+                "gates", "jobs", "musk", "bezos", "buffett", "zuckerberg",
+                "page", "brin", "nadella", "cook", "pichai", "sundar",
+                "einstein", "newton", "curie", "tesla", "darwin", "hawking",
+                "galileo", "da vinci", "michelangelo", "plato", "aristotle",
+                "dickens", "shakespeare", "twain", "austen", "presley",
+                "lennon", "mccartney", "jackson", "madonna", "swift",
+                "beethoven", "mozart", "bach", "bacon", "edison", "bell",
+                "lovelace", "turing", "shannon", "feynman", "tesla",
+                "nobel", "marie curie", "charles darwin", "isaac newton",
+                "albert einstein", "stephen hawking", "galileo galilei",
+                "leonardo da vinci", "michelangelo", "winston churchill",
+                "franklin roosevelt", "abraham lincoln", "george washington",
+                "john f kennedy", "richard nixon", "ronald reagan",
+                "jimmy carter", "bill clinton", "george bush", "barack obama",
+                "donald trump", "joe biden", "bill gates", "steve jobs",
+                "elon musk", "jeff bezos", "warren buffett", "mark zuckerberg",
+                "larry page", "sergey brin", "satya nadella", "tim cook",
+                "sundar pichai", "sam altman", "dario amodei",
+                # Technology/programming languages/frameworks
+                "python", "javascript", "java", "c++", "c#", "ruby", "php", "swift", "kotlin",
+                "go", "rust", "typescript", "scala", "r", "matlab", "perl", "shell", "bash",
+                "react", "vue", "angular", "django", "flask", "spring", "express", "fastapi",
+                "tensorflow", "pytorch", "keras", "scikit", "pandas", "numpy", "sql", "nosql",
+                "aws", "azure", "gcp", "docker", "kubernetes", "linux", "windows", "macos",
+                "git", "github", "gitlab", "jenkins", "ci", "cd", "api", "rest", "graphql",
+                "html", "css", "json", "xml", "yaml", "regex", "ai", "ml", "nlp", "cv",
+                "llm", "gpt", "bert", "transformer", "neural", "deep", "machine", "learning",
+                "data", "science", "analytics", "mining", "visualization", "statistics",
+                # Common educational/scientific terms that start sentences
+                "recursion", "photosynthesis", "artificial", "intelligence", "machine", "learning",
+                "artificial intelligence", "machine learning", "deep learning",
+                # Python-specific multi-word terms that commonly start sentences
+                "python programming", "python language", "python script", "python code",
+                "python interpreter", "python compiler", "python runtime", "python version",
+                "python library", "python module", "python package", "python framework",
+                "python developer", "python developer", "python programming language",
+                "algorithm", "function", "variable", "object", "class", "method", "loop",
+                "array", "list", "dictionary", "tree", "graph", "hash", "sort", "search",
+                "database", "network", "protocol", "server", "client", "endpoint",
+                "compiler", "interpreter", "runtime", "memory", "cpu", "gpu", "thread",
+                "process", "async", "sync", "callback", "promise", "future", "await",
+                "binary", "decimal", "hexadecimal", "octal", "bit", "byte", "word",
+                "quantum", "computing", "qubit", "superposition", "entanglement",
+                "cell", "molecule", "atom", "electron", "proton", "neutron", "dna",
+                "rna", "protein", "enzyme", "gene", "chromosome", "genome", "evolution",
+                "species", "organism", "ecosystem", "population", "community", "biome",
+                "energy", "force", "mass", "velocity", "acceleration", "momentum",
+                "gravity", "thermodynamics", "entropy", "equilibrium", "pressure",
+                "temperature", "volume", "density", "concentration", "reaction",
+                "catalyst", "reactant", "product", "yield", "rate", "constant", "law"
+            }
+            entity_lower = entity.lower()
+            # Also skip if entity is a sentence starter
+            if entity_lower in sentence_starters:
+                return None
+            # Skip if the response is hedging/admitting uncertainty rather than asserting a fact
+            hedge_phrases = [
+                "don't have", "do not have", "no information", "not aware",
+                "cannot verify", "can't verify", "unable to verify",
+                "i don't know", "not familiar", "no verified", "no data on",
+                "not in my", "haven't been able to find",
+                # Additional hedge phrases for qwen2.5 models
+                "not sure", "not certain", "not confident", "not equipped",
+                "i am not sure", "i am not certain", "i am not confident",
+                "beyond my knowledge", "beyond my current knowledge",
+                "beyond what i know", "beyond my training",
+                "i cannot answer that", "i'm unable to answer",
+                "not in a position to", "not equipped to answer",
+                "i don't have enough information", "i lack information",
+                "i don't have access to", "i don't have data on",
+                "i'm not in a position", "that's not something i can",
+                "i'm not able to verify", "i can't confirm",
+                "i don't have verified", "i'm not equipped",
+                "not something i can confirm", "not something i can verify",
+                "i don't have sufficient", "i'm not sufficiently informed",
+                "not aware of", "i'm not aware of",
+                "can't say for certain", "can't say with certainty",
+                "not in my training data", "not in my knowledge base",
+            ]
+            if any(h in low for h in hedge_phrases):
+                return None
+            if entity_lower not in generic_terms and len(entity) > 2:
+                return f"unsupported_grounded_claim:bare_company_factual:{entity}"
     return None
-
 
 def validate_chat_response(
     text: str,
@@ -240,9 +359,13 @@ def validate_chat_response(
     }
 
 
-def get_safe_fallback(intent: Optional[str] = None, rag_used: bool = False) -> str:
+def get_safe_fallback(intent: Optional[str] = None, rag_used: bool = False, issues: Optional[List[str]] = None) -> str:
     """Provide safe, non-hallucinating fallback preserving intent."""
     base = "I apologize — I wasn't able to generate a complete response at the moment."
+    # Check for bare company factual claim issue
+    has_bare_company_claim = issues and any(i.startswith("unsupported_grounded_claim:bare_company_factual") for i in issues)
+    if has_bare_company_claim:
+        return base + " I don't have verified information about that company in my current knowledge sources. If you provide the company's details or documents, I can answer based on those."
     if intent == "career":
         return base + " Here's general career guidance: consider clarifying your current skills, target role, and timeline, and I can provide a phased plan (Now / Next 3 months / 12 months) with validation steps."
     if intent == "resume":

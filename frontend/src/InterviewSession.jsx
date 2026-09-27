@@ -50,6 +50,8 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
   const pendingSpeakRef = useRef(null)
   const baseTranscriptRef = useRef('')
   const listeningIntentRef = useRef(false)
+  const microphoneEnabledRef = useRef(false)
+  const restartTimerRef = useRef(null)
   const transcriptRef = useRef('')
   useEffect(() => { transcriptRef.current = transcript }, [transcript])
 
@@ -196,13 +198,15 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     }
     rec.onend = () => {
       // Preserve transcript; auto-restart if user still intends to record (allows natural pauses)
-      if (listeningIntentRef.current) {
+      // Only restart if microphone is explicitly enabled by user
+      if (microphoneEnabledRef.current && listeningIntentRef.current) {
         // Update base to current transcript before restart (use ref to avoid stale closure)
         baseTranscriptRef.current = transcriptRef.current
         try {
           // Small delay to avoid rapid restart loops
-          setTimeout(() => {
-            if (listeningIntentRef.current && recognitionRef.current) {
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = setTimeout(() => {
+            if (microphoneEnabledRef.current && listeningIntentRef.current && recognitionRef.current) {
               try { recognitionRef.current.start() } catch {}
             }
           }, 250)
@@ -216,18 +220,29 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     rec.onerror = (event) => {
       const err = event.error || 'unknown'
       recordProctorEvent('speech_recognition_error', 'warning')
-      if (err === 'not-allowed' || err === 'permission-denied' || err === 'audio-capture') {
+      // If microphone was explicitly turned OFF, don't restart on errors
+      if (!microphoneEnabledRef.current) {
         listeningIntentRef.current = false
         setIsListening(false)
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
+        return
+      }
+      if (err === 'not-allowed' || err === 'permission-denied' || err === 'audio-capture') {
+        listeningIntentRef.current = false
+        microphoneEnabledRef.current = false
+        setIsListening(false)
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
         setMicPermission('denied')
         recordProctorEvent('microphone_permission_denied', 'warning')
         setSetupError('Microphone permission denied. Please allow microphone access.')
       } else if (err === 'no-speech') {
         // No speech is natural pause - do not treat as end, auto-restart if intent active
-        if (listeningIntentRef.current) {
-          setTimeout(() => {
-            if (listeningIntentRef.current && recognitionRef.current) {
+        if (listeningIntentRef.current && microphoneEnabledRef.current) {
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = setTimeout(() => {
+            if (listeningIntentRef.current && microphoneEnabledRef.current && recognitionRef.current) {
               try { recognitionRef.current.start() } catch {}
             }
           }, 300)
@@ -236,10 +251,11 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
         setIsListening(false)
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       } else {
-        // For other errors, try restart if intent active
-        if (listeningIntentRef.current) {
-          setTimeout(() => {
-            if (listeningIntentRef.current && recognitionRef.current) {
+        // For other errors, try restart if intent active and microphone enabled
+        if (listeningIntentRef.current && microphoneEnabledRef.current) {
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = setTimeout(() => {
+            if (listeningIntentRef.current && microphoneEnabledRef.current && recognitionRef.current) {
               try { recognitionRef.current.start() } catch {}
             }
           }, 400)
@@ -247,13 +263,16 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
         }
         setIsListening(false)
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
         setSetupError(`Speech recognition error: ${err}`)
       }
     }
     rec.onaudiostart = () => setMicPermission('granted')
     recognitionRef.current = rec
     return () => {
+      microphoneEnabledRef.current = false
       listeningIntentRef.current = false
+      if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
       try { rec.abort() } catch {}
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -309,6 +328,7 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
       if (isSpeechSynthesisSupported()) window.speechSynthesis.cancel()
       if (timerRef.current) clearInterval(timerRef.current)
       if (interviewTimerRef.current) clearInterval(interviewTimerRef.current)
+      if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
       if (cameraStream) cameraStream.getTracks().forEach(t => t.stop())
     }
   }, [cameraStream])
@@ -464,6 +484,7 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     }
     setSetupError(null)
     baseTranscriptRef.current = transcript
+    microphoneEnabledRef.current = true
     listeningIntentRef.current = true
     setIsListening(true)
     setElapsed(0)
@@ -471,11 +492,13 @@ export function InterviewSession({ interviewId, sessionId: initialSessionId, onB
     try {
       recognitionRef.current.start()
     } catch (e) {
-      try { recognitionRef.current.stop(); setTimeout(() => { baseTranscriptRef.current = transcript; listeningIntentRef.current = true; recognitionRef.current.start() }, 150) } catch {}
+      try { recognitionRef.current.stop(); if (restartTimerRef.current) clearTimeout(restartTimerRef.current); restartTimerRef.current = setTimeout(() => { baseTranscriptRef.current = transcript; if (microphoneEnabledRef.current && listeningIntentRef.current) recognitionRef.current.start() }, 150) } catch {}
     }
   }
   function stopListening() {
+    microphoneEnabledRef.current = false
     listeningIntentRef.current = false
+    if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null }
     if (recognitionRef.current) {
       try { recognitionRef.current.stop() } catch {}
     }

@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Dict, Optional, List, Tuple
 
-from app.services.llm import generate_response, generate_response_stream, OllamaError
+from app.services.llm import generate_response, generate_response_stream, OllamaError, get_num_predict
 from app.services import conversation_memory as conv_mem
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,8 @@ except Exception as _e:
 
 GENERAL_SYSTEM_PROMPT = """You are Ardhanarishwar Solver, the general assistant for the Ardhanarishwar Solver AI platform (local Qwen 2.5 3B via Ollama).
 
+CRITICAL: Answer directly and confidently, like a knowledgeable expert — do not hedge or add disclaimers for things you actually know from training (general facts, well-known people, companies, history, science, how-to questions, etc.). For time-sensitive facts that may have changed since training (e.g. current officeholders, current prices, latest versions of things), answer with your best training-data knowledge and add a brief one-line caveat such as 'as of my last update' rather than refusing to answer. The ONLY time you should say you don't have information is when asked about a specific, obscure, or unverifiable named entity (e.g. a small private company or organization) that you have no real training knowledge of — in that narrow case, say so briefly rather than inventing plausible-sounding details.
+
 Responsibility: Help across career, education, professional development, recruitment, business and everyday general questions. Prioritize the user's actual request; answer what was asked, not a generic template.
 
 Guidelines:
@@ -46,7 +48,8 @@ Guidelines:
 - If the request is ambiguous or lacks needed detail, ask 1-2 specific clarifying questions instead of guessing.
 - Never claim live browsing, live job listings, real-time market data, or access to proprietary/verified databases. If you lack verified data, say so and offer general best-practice guidance.
 - Never invent ATS scores, interview banks, or course catalog entries.
-- Tone: supportive, professional, concise."""
+- Tone: supportive, professional, concise.
+- Important: Answer the user directly and naturally. Do not mention context, documents, retrieval, RAG, sources, or internal system implementation unless the user explicitly asks how the assistant works. Use provided context for factual accuracy when relevant, but do not mention it."""
 
 AGENTS = {
     "career": None,
@@ -212,84 +215,6 @@ def _word_match(msg, word):
     return bool(re.search(r'\b' + re.escape(word) + r'\b', msg))
 
 
-def _matches_recruitment(msg: str) -> bool:
-    recruitment_keywords = [
-        "hire", "hiring", "recruit", "recruitment", "candidate", "screening",
-        "job description", "job posting", "find candidates", "need to hire",
-        "talent acquisition", "staffing", "headcount",
-    ]
-    for kw in recruitment_keywords:
-        if _word_match(msg, kw):
-            return True
-    return False
-
-
-def _matches_resume(msg: str) -> bool:
-    resume_keywords = [
-        "resume", "cv", "cover letter", "ats", "job application",
-        "job applications", "resume builder", "cv structure",
-    ]
-    for kw in resume_keywords:
-        if _word_match(msg, kw):
-            return True
-    return False
-
-
-def _matches_interview(msg: str) -> bool:
-    interview_keywords = [
-        "interview", "mock interview", "behavioral", "technical interview",
-        "interview preparation", "interview questions", "mock question",
-    ]
-    for kw in interview_keywords:
-        if _word_match(msg, kw):
-            return True
-    return False
-
-
-def _matches_learning(msg: str) -> bool:
-    learning_keywords = [
-        "learn", "learning", "skill", "skills", "education", "training",
-        "roadmap", "course", "courses", "what should i learn", "what to learn",
-        "study", "certification", "certifications", "tutorial", "tutorials",
-    ]
-    for kw in learning_keywords:
-        if _word_match(msg, kw):
-            return True
-    # Handle plural / generic course mentions via substring for robustness
-    if _word_match(msg, "courses"):
-        return True
-    return False
-
-
-def _matches_career(msg: str) -> bool:
-    career_keywords = [
-        "career", "career path", "career planning", "job search", "job hunt",
-        "apply for", "career decisions", "career change", "promotion",
-        "advancement", "career development", "which career", "professional",
-        "become a", "become an", "data scientist",
-    ]
-    for kw in career_keywords:
-        if _word_match(msg, kw):
-            return True
-    # Fallback heuristic: "become" + professional context often indicates career intent
-    if _word_match(msg, "become") and ("data" in msg or "scientist" in msg or "engineer" in msg or "developer" in msg):
-        return True
-    return False
-
-
-def _matches_business(msg: str) -> bool:
-    business_keywords = [
-        "business", "company", "workforce", "hr", "human resource",
-        "productivity", "employee", "organization", "process",
-        "management", "corporate", "enterprise", "workplace",
-        "profit", "revenue", "stakeholder",
-    ]
-    for kw in business_keywords:
-        if _word_match(msg, kw):
-            return True
-    return False
-
-
 # ---- Phase 3: lightweight scoring for debuggable routing ----
 
 INTENT_KEYWORDS = {
@@ -318,8 +243,9 @@ INTENT_KEYWORDS = {
         "become a", "become an", "data scientist",
     ],
     "business": [
-        "business", "company", "workforce", "hr", "human resource",
-        "productivity", "employee", "organization", "process",
+        "recruweb",
+        "workforce", "hr", "human resource",
+        "productivity", "employee",
         "management", "corporate", "enterprise", "workplace",
         "profit", "revenue", "stakeholder",
     ],
@@ -505,25 +431,42 @@ def _detect_with_context(message: str, history: List[Dict[str, str]], conversati
     # Bug 1 fix: standalone greetings/smalltalk must never inherit stale intent
     if _is_standalone_greeting_or_smalltalk(lower):
         return base
-    # follow-up cues (expanded for Phase 3)
-    followup_cues = [
-        "what should", "what about", "how about", "tell me more", "which", "skills", "first", "next",
-        "it", "that", "learn", "become", "roadmap", "course", "prepare", "screening", "them",
-        "this", "these", "those", "more", "example", "explain"
+    
+    # Check for genuine follow-up patterns that indicate continuation of previous topic
+    # These patterns indicate the user is asking for MORE info about the previous topic
+    followup_patterns = [
+        r"\bwhat\s+(do\s+you\s+know\s+about|else\s+do\s+you\s+know)\s+(this|that|it|them)\b",
+        r"\btell\s+me\s+more\s+about\s+(this|that|it|them)\b",
+        r"\bwhat\s+about\s+(this|that|it|them)\b",
+        r"\bwhere\s+is\s+(this|that|it)\s+(located|based)\b",
+        r"\bwho\s+(founded|started|created)\s+(this|that|it)\b",
+        r"\bwhen\s+was\s+(this|that|it)\s+(founded|started|created)\b",
+        r"\bhow\s+(big|large|small)\s+is\s+(this|that|it)\b",
+        r"\bwhat\s+(else|more)\s+(do\s+you\s+know|can\s+you\s+tell\s+me)\s+about\s+(this|that|it|them)\b",
+        r"\btell\s+me\s+more\b",
+        r"\bmore\s+details\b",
+        r"\belaborate\b",
+        r"\bexpand\s+on\s+(this|that|it)\b",
+        r"\bexplain\s+(this|that|it)\b",
+        r"\bexplain\s+it\s+with\s+an\s+example\b\.?",
     ]
-    has_cue = any(cue in lower for cue in followup_cues)
-    # Also check pronoun word-boundary for 'it'/'that' without trailing space
-    if not has_cue:
-        if re.search(r"\b(it|that|this|these|those|them)\b", lower):
-            has_cue = True
-    # Bug 1 fix: only reuse last intent when message is genuinely contextual (has cue)
-    # Previous `is_short or has_cue` incorrectly treated "hello" (1 word) as contextual
-    if has_cue:
+    
+    has_genuine_followup = any(re.search(pattern, message.lower()) for pattern in followup_patterns)
+    
+    # Also check for simple pronoun follow-ups like "what about this?" "what about that?" 
+    # but only when they're clearly asking about the previous topic
+    simple_followup = re.search(r"\bwhat\s+about\s+(this|that|it)\b", message.lower())
+    
+    has_genuine_followup = has_genuine_followup or simple_followup
+    
+    # Bug 1 fix: only reuse last intent when message is genuinely contextual (has genuine followup)
+    # Previous logic incorrectly treated "what is artificial intelligence" as contextual because of "what"
+    if has_genuine_followup:
         # Special mapping: if last was career and now asks about learning, prefer learning
-        if last_intent == "career" and any(k in lower for k in ["learn", "skill", "course", "roadmap", "education"]):
+        if last_intent == "career" and any(k in message.lower() for k in ["learn", "skill", "course", "roadmap", "education"]):
             return "learning"
         # If last was recruitment and follow-up mentions screening, keep recruitment
-        if last_intent == "recruitment" and any(k in lower for k in ["screen", "candidate", "them"]):
+        if last_intent == "recruitment" and any(k in message.lower() for k in ["screen", "candidate", "them"]):
             return "recruitment"
         return last_intent
     return base
@@ -579,7 +522,7 @@ def _get_rag_results(message: str):
     if not _RAG_AVAILABLE:
         return [], "", []
     try:
-        results = _rag_retrieve(message, top_k=3, threshold=0.12)
+        results = _rag_retrieve(message, top_k=3, threshold=0.15)
         ctx = _rag_format_context(results) if results else ""
         sources = [
             {
@@ -636,17 +579,17 @@ def _augment_with_rag(prompt_or_message: str, rag_context: str, has_results: boo
         return (
             f"{rag_context}\n\n"
             f"User question: {prompt_or_message}\n\n"
-            "Instruction: Use retrieved docs when relevant; cite sources; distinguish retrieved vs general knowledge; don't fabricate company facts."
+            "Instruction: Use provided context for factual accuracy when relevant. Answer the user directly and naturally. Do not mention context, documents, retrieval, RAG, sources, or internal system implementation unless the user explicitly asks how the assistant works. Do not fabricate company facts."
         )
-    # No relevant docs: short guard note (system prompt already covers fabrication)
+    # No relevant docs: stronger guard note for company-specific factual questions
     # Avoid duplicate if already present
     if "[RAG note" in prompt_or_message:
         return prompt_or_message
-    # Phase 8: keep concise but always include guard to preserve quality/test compatibility
-    # Shortened from ~210 chars to ~115 chars saves ~24 tokens per request without losing instruction
     return (
         f"{prompt_or_message}\n\n"
-        "[RAG note: No relevant documents found in approved local knowledge base; answer from general knowledge, don't fabricate company data.]"
+        "[RAG note: No relevant documents found in approved local knowledge base. "
+        "Do NOT answer company-specific factual questions from general knowledge. "
+        "State that verified information is unavailable and offer to answer if user provides sources.]"
     )
 
 def _augment_with_memory(prompt: str, memory_context: str) -> str:
@@ -685,48 +628,37 @@ def _sanitize_response(text: str) -> str:
     return cleaned
 
 
-async def _validated_generate(prompt: str, system_prompt: Optional[str], intent: Optional[str], rag_used: bool, rag_results: Optional[List[Dict]], message: Optional[str], max_retries: int = 1) -> Tuple[str, Dict]:
+async def _validated_generate(prompt: str, system_prompt: Optional[str], intent: Optional[str], rag_used: bool, rag_results: Optional[List[Dict]], message: Optional[str], max_retries: int = 1, num_predict: Optional[int] = None) -> Tuple[str, Dict, str | None]:
     """Phase 7: call LLM with lightweight validation and bounded retry."""
     attempt = 0
     last_validation = {"is_valid": True, "issues": [], "should_retry": False, "latency_ms": 0}
+    done_reason = None
     while attempt <= max_retries:
         try:
-            raw = await generate_response(prompt, system_prompt=system_prompt)
+            raw = await generate_response(prompt, system_prompt=system_prompt, num_predict=num_predict)
+            done_reason = getattr(raw, "done_reason", None)
         except OllamaError as e:
-            logger.warning(f"LLM unavailable during _validated_generate: {e.message}")
             fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
             if rag_used:
                 fallback += " (Based on retrieved context where available; general guidance otherwise.)"
-            return fallback, {"is_valid": True, "issues": [f"llm_unavailable:{e.message}"], "should_retry": False, "latency_ms": 0}
+            return fallback, {"is_valid": True, "issues": [f"llm_unavailable:{e.message}"], "should_retry": False, "latency_ms": 0}, None
         except Exception as e:
-            logger.warning(f"LLM unexpected error during _validated_generate: {e}")
             fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
-            return fallback, {"is_valid": True, "issues": ["llm_error"], "should_retry": False, "latency_ms": 0}
+            return fallback, {"is_valid": True, "issues": ["llm_error"], "should_retry": False, "latency_ms": 0}, None
         text = raw.response if hasattr(raw, "response") else str(raw)
         if _VALIDATION_AVAILABLE:
             validation = validate_chat_response(text, intent=intent, rag_used=rag_used, rag_results=rag_results, message=message)
             last_validation = validation
             if validation["is_valid"]:
-                return text, validation
-            # Invalid
-            logger.warning(f"Validation failed (attempt {attempt}): {validation['issues']} for intent={intent} rag_used={rag_used}")
+                return text, validation, done_reason
             if validation["should_retry"] and attempt < max_retries:
                 attempt += 1
-                # Bounded retry: add instruction to avoid previous artifact
                 prompt = prompt + "\n\n[Validation note: previous response was malformed/empty, please provide a concise well-formed answer without repetition or error artifacts.]"
-                continue
-            else:
-                # Safe fallback (preserve good intent, no hallucination)
-                fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
-                # For RAG, ensure fallback distinguishes retrieved vs generated
-                if rag_used:
-                    fallback += " (Based on retrieved context where available; general guidance otherwise.)"
-                return fallback, validation
         else:
-            return text, last_validation
+            return text, last_validation, done_reason
     # Should not reach here
     fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
-    return fallback, last_validation
+    return fallback, last_validation, None
 
 
 def _validated_agent_response(text: str, intent: Optional[str], rag_used: bool, rag_results: Optional[List[Dict]], message: Optional[str]) -> Tuple[str, Dict]:
@@ -810,13 +742,15 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
 
     routing_reason = _get_routing_reason(intent, analysis)
 
-    # Phase 4: RAG retrieval (lightweight local)
-    rag_results, rag_context, rag_sources = _get_rag_results(message)
+    # Phase 4: RAG retrieval + Phase 5: long-term memory in parallel (both are I/O-bound)
+    async def _fetch_both():
+        rag_results, rag_context, rag_sources = _get_rag_results(message)
+        memory_context = _get_memory_context(uid)
+        return rag_results, rag_context, rag_sources, memory_context
+
+    rag_results, rag_context, rag_sources, memory_context = await _fetch_both()
     rag_used = len(rag_results) > 0
     logger.info(f"RAG retrieval: used={rag_used} count={len(rag_results)} (cid={cid})")
-
-    # Phase 5: long-term memory context (structured, bounded)
-    memory_context = _get_memory_context(uid)
 
     if intent == "general":
         # Bounded, relevant context only — avoid dominating old history
@@ -828,7 +762,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
         # Inject RAG context (or fallback note) before LLM call
         prompt = _augment_with_rag(prompt, rag_context, rag_used)
         # Phase 7: validated generation with bounded retry
-        validated_text, validation = await _validated_generate(prompt, GENERAL_SYSTEM_PROMPT, intent, rag_used, rag_results, message)
+        validated_text, validation, done_reason = await _validated_generate(prompt, GENERAL_SYSTEM_PROMPT, intent, rag_used, rag_results, message, num_predict=get_num_predict(intent))
         sanitized = _sanitize_response(validated_text)
         result = {
             "response": sanitized,
@@ -847,6 +781,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
             "validation_issues": validation.get("issues", []),
             "validation_passed": validation.get("is_valid", True),
             "validation_latency_ms": validation.get("latency_ms", 0),
+            "done_reason": done_reason,
         }
         conv_mem.add_message(cid, "assistant", sanitized)
         _last_intent[cid] = intent
@@ -863,7 +798,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
         # Inject memory then RAG
         prompt = _augment_with_memory(prompt, memory_context)
         prompt = _augment_with_rag(prompt, rag_context, rag_used)
-        validated_text, validation = await _validated_generate(prompt, GENERAL_SYSTEM_PROMPT, intent, rag_used, rag_results, message)
+        validated_text, validation, done_reason = await _validated_generate(prompt, GENERAL_SYSTEM_PROMPT, intent, rag_used, rag_results, message, num_predict=get_num_predict(intent))
         sanitized = _sanitize_response(validated_text)
         result = {
             "response": sanitized,
@@ -882,6 +817,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
             "validation_issues": validation.get("issues", []),
             "validation_passed": validation.get("is_valid", True),
             "validation_latency_ms": validation.get("latency_ms", 0),
+            "done_reason": done_reason,
         }
         conv_mem.add_message(cid, "assistant", sanitized)
         _last_intent[cid] = intent
@@ -911,7 +847,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
         try:
             result = await agent_fn(augmented_message, effective_context)
         except OllamaError as e:
-            logger.warning(f"Agent LLM unavailable for intent {intent}: {e.message}")
+            logger.error(f"Agent LLM unavailable for intent {intent}: status={e.status_code}, message={e.message}, rag_used={rag_used}")
             fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
             result = {"response": fallback_text, "intent": intent, "agent": intent}
             last_validation = {"is_valid": True, "issues": [f"llm_unavailable:{e.message}"], "should_retry": False, "latency_ms": 0}
@@ -920,13 +856,13 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
             try:
                 result = await agent_fn(augmented_message)
             except OllamaError as e2:
-                logger.warning(f"Agent LLM unavailable (fallback call) for intent {intent}: {e2.message}")
+                logger.error(f"Agent LLM unavailable (fallback call) for intent {intent}: status={e2.status_code}, message={e2.message}, rag_used={rag_used}")
                 fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
                 result = {"response": fallback_text, "intent": intent, "agent": intent}
                 last_validation = {"is_valid": True, "issues": [f"llm_unavailable:{e2.message}"], "should_retry": False, "latency_ms": 0}
                 break
         except Exception as e:
-            logger.warning(f"Agent unexpected error for intent {intent}: {e}")
+            logger.error(f"Agent unexpected error for intent {intent}: {type(e).__name__}: {e}, rag_used={rag_used}")
             fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
             result = {"response": fallback_text, "intent": intent, "agent": intent}
             last_validation = {"is_valid": True, "issues": ["agent_error"], "should_retry": False, "latency_ms": 0}
@@ -947,7 +883,7 @@ async def route_message(message: str, conversation_id: Optional[str] = None, use
                 continue
             else:
                 # Safe fallback for agent
-                fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used)
+                fallback_text = get_safe_fallback(intent=intent, rag_used=rag_used, issues=validation["issues"])
                 if isinstance(result, dict):
                     result["response"] = fallback_text
                 else:
@@ -1014,11 +950,14 @@ async def stream_message(message: str, conversation_id: Optional[str] = None, us
     agent = None if intent == "general" else intent
     routing_reason = _get_routing_reason(intent, analysis)
 
-    # Phase 4: RAG for streaming
-    rag_results, rag_context, rag_sources = _get_rag_results(message)
+    # Phase 4: RAG for streaming + Phase 5: memory in parallel
+    async def _fetch_stream_both():
+        rag_results, rag_context, rag_sources = _get_rag_results(message)
+        memory_context = _get_memory_context(uid)
+        return rag_results, rag_context, rag_sources, memory_context
+
+    rag_results, rag_context, rag_sources, memory_context = await _fetch_stream_both()
     rag_used = len(rag_results) > 0
-    # Phase 5: memory for streaming
-    memory_context = _get_memory_context(uid)
 
     # Add user message
     conv_mem.add_message(cid, "user", message)
@@ -1066,20 +1005,20 @@ async def stream_message(message: str, conversation_id: Optional[str] = None, us
         prompt = f"{prompt}\n\n[Multi-domain: primary {intent}, also {secondary}]"
     full_response = []
     try:
-        async for chunk in generate_response_stream(prompt, system_prompt=system_prompt):
+        async for chunk_data in generate_response_stream(prompt, system_prompt=system_prompt, num_predict=get_num_predict(intent)):
+            chunk = chunk_data["content"]
+            done_reason = chunk_data.get("done_reason")
             full_response.append(chunk)
-            yield {"type": "chunk", "content": chunk}
+            yield {"type": "chunk", "content": chunk, "done_reason": done_reason}
     except OllamaError as e:
-        logger.warning(f"Stream LLM unavailable: {e.message}")
-        fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
-        # Yield fallback as single chunk so frontend receives usable content instead of error only
-        yield {"type": "chunk", "content": fallback}
-        full_response = [fallback]
+        logger.error(f"Stream LLM unavailable: status={e.status_code}, message={e.message}, intent={intent}, rag_used={rag_used}")
+        # Yield error event so frontend can handle it properly instead of showing generic fallback
+        yield {"type": "error", "detail": e.message}
+        full_response = []
     except Exception as e:
-        logger.warning(f"Stream unexpected error: {e}")
-        fallback = get_safe_fallback(intent=intent, rag_used=rag_used)
-        yield {"type": "chunk", "content": fallback}
-        full_response = [fallback]
+        logger.error(f"Stream unexpected error: {type(e).__name__}: {e}, intent={intent}, rag_used={rag_used}")
+        yield {"type": "error", "detail": "Internal server error"}
+        full_response = []
     # After streaming complete, validate and add assistant to memory (sanitized, capped) — Phase 7
     if full_response:
         raw_final = "".join(full_response)
@@ -1088,7 +1027,7 @@ async def stream_message(message: str, conversation_id: Optional[str] = None, us
             if not v["is_valid"]:
                 logger.warning(f"Stream validation failed: {v['issues']}")
                 if not v["should_retry"]:
-                    raw_final = get_safe_fallback(intent=intent, rag_used=rag_used)
+                    raw_final = get_safe_fallback(intent=intent, rag_used=rag_used, issues=v["issues"])
                 # For should_retry, we already streamed invalid content; keep fallback for history only to avoid duplicate stream
                 # Do not re-stream fallback to keep latency bounded
         final_text = _sanitize_response(raw_final)

@@ -8,6 +8,7 @@ import './App.css'
 
 const STORAGE_KEY = 'ard_conversations'
 const CURRENT_CONV_KEY = 'ard_conversation_id'
+const SESSION_INIT_KEY = 'ard_session_initialized'
 
 function loadConversations() {
   try {
@@ -20,6 +21,38 @@ function loadConversations() {
 function saveConversations(conversations) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
+  } catch {}
+}
+
+function getActiveConversationId() {
+  try {
+    const stored = sessionStorage.getItem(CURRENT_CONV_KEY)
+    if (stored) return stored
+  } catch {}
+  return null
+}
+
+function setActiveConversationId(id) {
+  try {
+    if (id) {
+      sessionStorage.setItem(CURRENT_CONV_KEY, id)
+    } else {
+      sessionStorage.removeItem(CURRENT_CONV_KEY)
+    }
+  } catch {}
+}
+
+function isFreshSession() {
+  try {
+    return !sessionStorage.getItem(SESSION_INIT_KEY)
+  } catch {
+    return true
+  }
+}
+
+function markSessionInitialized() {
+  try {
+    sessionStorage.setItem(SESSION_INIT_KEY, '1')
   } catch {}
 }
 
@@ -112,14 +145,19 @@ function App() {
   const [status, setStatus] = useState('checking')
   const [conversations, setConversations] = useState(() => loadConversations())
   const [currentConversationId, setCurrentConversationId] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CURRENT_CONV_KEY)
-      if (stored) return stored
-    } catch {}
-    return null
+    // On fresh session (browser refresh), create new conversation instead of restoring
+    if (isFreshSession()) {
+      markSessionInitialized()
+      const id = generateId()
+      setActiveConversationId(id)
+      return id
+    }
+    // Within same session, restore active conversation
+    return getActiveConversationId()
   })
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState(null)
   const [interviewView, setInterviewView] = useState('chat')
   const [scheduledInterviewId, setScheduledInterviewId] = useState(null)
@@ -133,6 +171,7 @@ function App() {
   const [voiceBase, setVoiceBase] = useState('')
   const ttsBufferRef = useRef('')
   const conversationsRef = useRef(conversations)
+  const abortControllerRef = useRef(null)
 
   useEffect(() => {
     conversationsRef.current = conversations
@@ -206,7 +245,7 @@ function App() {
     if (!activeConvId) {
       activeConvId = generateId()
       setCurrentConversationId(activeConvId)
-      try { localStorage.setItem(CURRENT_CONV_KEY, activeConvId) } catch {}
+      setActiveConversationId(activeConvId)
     }
 
     // Ensure conversation exists in the list (for new chats that haven't sent a message yet)
@@ -228,7 +267,12 @@ function App() {
       messages: [...conv.messages, userMsg]
     }), activeConvId)
     setIsLoading(true)
+    setIsGenerating(true)
     setError(null)
+
+    // Create new AbortController for this generation
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     let streamContent = ''
     let streamIntent = null
@@ -242,10 +286,9 @@ function App() {
     }, activeConvId)
 
     // Find the streaming assistant message by looking for the last assistant message with streaming=true
-    const updateAssistant = (content, intent, agent, streaming) => {
+    const updateAssistant = (content, intent, agent, streaming, done_reason) => {
       updateCurrentConversation(conv => {
         const messages = conv.messages
-        // Find the last assistant message that is streaming (or the last assistant message if not streaming anymore)
         let idx = -1
         for (let i = messages.length - 1; i >= 0; i--) {
           if (messages[i].role === 'assistant' && (streaming || messages[i].streaming)) {
@@ -261,6 +304,7 @@ function App() {
           intent: intent !== undefined ? intent : updated[idx].intent,
           agent: agent !== undefined ? agent : updated[idx].agent,
           streaming,
+          done_reason: done_reason !== undefined ? done_reason : updated[idx].done_reason,
         }
         return { ...conv, messages: updated }
       }, activeConvId)
@@ -294,24 +338,26 @@ function App() {
 
     const shouldStreamSpeak = autoSpeak && voice.ttsSupported
 
+    let streamDoneReason = null
     try {
       await sendChatMessageStream(message, {
-        onMeta: (meta) => {
+        onMeta: async (meta) => {
           streamIntent = meta.intent
           streamAgent = meta.agent
           if (meta.conversation_id && meta.conversation_id !== activeConvId) {
             activeConvId = meta.conversation_id
             setCurrentConversationId(meta.conversation_id)
-            try { localStorage.setItem(CURRENT_CONV_KEY, meta.conversation_id) } catch {}
+            setActiveConversationId(meta.conversation_id)
           }
-          updateAssistant(streamContent, streamIntent, streamAgent, true)
+          updateAssistant(streamContent, streamIntent, streamAgent, true, undefined)
         },
-        onChunk: (chunk) => {
+        onChunk: async (chunk, done_reason) => {
           gotChunk = true
           streamContent += chunk
           if (gotChunk) setIsLoading(false)
-          updateAssistant(streamContent, streamIntent, streamAgent, true)
-          // Streaming TTS: enqueue complete sentences as they become available, don't wait for full response
+          streamDoneReason = done_reason
+          updateAssistant(streamContent, streamIntent, streamAgent, true, done_reason)
+          await new Promise(r => setTimeout(r, 0))
           if (shouldStreamSpeak && chunk && !chunk.startsWith('Error:')) {
             ttsBufferRef.current += chunk
             const { sentences, remainder } = extractComplete(ttsBufferRef.current)
@@ -325,87 +371,94 @@ function App() {
           throw new Error(detail)
         },
         conversationId: activeConvId,
+        signal: controller.signal,
       })
-      if (!gotChunk) {
-        const data = await sendChatMessage(message, activeConvId)
-        if (data.conversation_id && data.conversation_id !== activeConvId) {
-          activeConvId = data.conversation_id
-          setCurrentConversationId(data.conversation_id)
-          try { localStorage.setItem(CURRENT_CONV_KEY, data.conversation_id) } catch {}
-        }
-        updateAssistant(data.response, data.intent, data.agent, false)
-        if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
-          // For non-stream fallback, queue single utterance via streaming queue to keep behavior consistent
-          ttsBufferRef.current = ''
-          voice.queueSpeak(data.response)
-        }
-      } else {
-        const finalStream = streamContent || '(no response)'
-        updateAssistant(finalStream, streamIntent, streamAgent, false)
-        // Flush any remaining buffered text after stream completion; do NOT re-speak entire finalStream (prevents duplicate)
-        if (shouldStreamSpeak && ttsBufferRef.current.trim()) {
-          const remaining = ttsBufferRef.current.trim()
-          ttsBufferRef.current = ''
-          if (remaining && !remaining.startsWith('Error:')) {
-            voice.queueSpeak(remaining)
+        if (!gotChunk) {
+          const data = await sendChatMessage(message, activeConvId)
+          if (data.conversation_id && data.conversation_id !== activeConvId) {
+            activeConvId = data.conversation_id
+            setCurrentConversationId(data.conversation_id)
+            setActiveConversationId(data.conversation_id)
+          }
+          updateAssistant(data.response, data.intent, data.agent, false, data.done_reason)
+          if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
+            ttsBufferRef.current = ''
+            voice.queueSpeak(data.response)
+          }
+        } else {
+          const finalStream = streamContent || '(no response)'
+          updateAssistant(finalStream, streamIntent, streamAgent, false, streamDoneReason)
+          if (shouldStreamSpeak && ttsBufferRef.current.trim()) {
+            const remaining = ttsBufferRef.current.trim()
+            ttsBufferRef.current = ''
+            if (remaining && !remaining.startsWith('Error:')) {
+              voice.queueSpeak(remaining)
+            }
           }
         }
-      }
       // Update conversation title after first exchange
       updateCurrentConversation(conv => {
         if (conv.title) return conv
         return { ...conv, title: getConversationTitle(conv.messages) }
       }, activeConvId)
     } catch (err) {
-      // On streaming error, cancel pending TTS and clear buffer to avoid stale speech
-      ttsBufferRef.current = ''
-      if (voice.isSpeaking) voice.cancelSpeak()
-      if (!gotChunk) {
-        try {
-          const data = await sendChatMessage(message, activeConvId)
-          if (data.conversation_id && data.conversation_id !== activeConvId) {
-            activeConvId = data.conversation_id
-            setCurrentConversationId(data.conversation_id)
-            try { localStorage.setItem(CURRENT_CONV_KEY, data.conversation_id) } catch {}
+      // Handle user-initiated stop (AbortError) - preserve partial response, don't show error
+      if (err.name === 'AbortError' || err.message === 'Aborted') {
+        // Generation was stopped by user - keep partial response as-is
+        updateAssistant(streamContent || '(stopped)', streamIntent, streamAgent, false, streamDoneReason)
+      } else {
+        // On streaming error, cancel pending TTS and clear buffer to avoid stale speech
+        ttsBufferRef.current = ''
+        if (voice.isSpeaking) voice.cancelSpeak()
+        if (!gotChunk) {
+          try {
+            const data = await sendChatMessage(message, activeConvId)
+            if (data.conversation_id && data.conversation_id !== activeConvId) {
+              activeConvId = data.conversation_id
+              setCurrentConversationId(data.conversation_id)
+              try { localStorage.setItem(CURRENT_CONV_KEY, data.conversation_id) } catch {}
+            }
+            updateAssistant(data.response, data.intent, data.agent, false, data.done_reason)
+            if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
+              voice.queueSpeak(data.response)
+            }
+            updateCurrentConversation(conv => {
+              if (conv.title) return conv
+              return { ...conv, title: getConversationTitle(conv.messages) }
+            }, activeConvId)
+          } catch (fallbackErr) {
+            setError(fallbackErr.message)
+            updateAssistant(`Error: ${fallbackErr.message}`, null, null, false)
+            updateCurrentConversation(conv => {
+              const messages = conv.messages
+              let idx = -1
+              for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].role === 'assistant') {
+                  idx = i
+                  break
+                }
+              }
+              if (idx !== -1) {
+                const updated = [...messages]
+                updated[idx] = { ...updated[idx], isError: true }
+                return { ...conv, messages: updated }
+              }
+              return conv
+            }, activeConvId)
           }
-          updateAssistant(data.response, data.intent, data.agent, false)
-          if (shouldStreamSpeak && data.response && !data.response.startsWith('Error:')) {
-            voice.queueSpeak(data.response)
-          }
+        } else {
+          setError(err.message)
+          updateAssistant(streamContent + `\n\nError: ${err.message}`, streamIntent, streamAgent, false, streamDoneReason)
           updateCurrentConversation(conv => {
             if (conv.title) return conv
             return { ...conv, title: getConversationTitle(conv.messages) }
           }, activeConvId)
-        } catch (fallbackErr) {
-          setError(fallbackErr.message)
-          updateAssistant(`Error: ${fallbackErr.message}`, null, null, false)
-          updateCurrentConversation(conv => {
-            const messages = conv.messages
-            let idx = -1
-            for (let i = messages.length - 1; i >= 0; i--) {
-              if (messages[i].role === 'assistant') {
-                idx = i
-                break
-              }
-            }
-            if (idx !== -1) {
-              const updated = [...messages]
-              updated[idx] = { ...updated[idx], isError: true }
-              return { ...conv, messages: updated }
-            }
-            return conv
-          }, activeConvId)
         }
-      } else {
-        setError(err.message)
-        updateAssistant(streamContent + `\n\nError: ${err.message}`, streamIntent, streamAgent, false)
-        updateCurrentConversation(conv => {
-          if (conv.title) return conv
-          return { ...conv, title: getConversationTitle(conv.messages) }
-        }, activeConvId)
       }
     } finally {
       setIsLoading(false)
+      setIsGenerating(false)
+      abortControllerRef.current = null
       inputRef.current?.focus()
     }
   }
@@ -424,6 +477,15 @@ function App() {
     setVoiceBase('')
     await sendMessage(finalText)
   }
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    // Cancel any pending TTS for the cancelled response
+    if (voice.isSpeaking) voice.cancelSpeak()
+    ttsBufferRef.current = ''
+  }, [voice])
 
   const handleVoiceToggle = () => {
     if (voice.isListening) {
@@ -461,13 +523,15 @@ function App() {
   const handleNewChat = () => {
     if (voice.isListening) voice.stopListening()
     if (voice.isSpeaking) voice.cancelSpeak()
+    if (abortControllerRef.current) abortControllerRef.current.abort()
     ttsBufferRef.current = ''
     setError(null)
     setInputValue('')
     setVoiceBase('')
+    setIsGenerating(false)
     const id = generateId()
     setCurrentConversationId(id)
-    try { localStorage.setItem(CURRENT_CONV_KEY, id) } catch {}
+    setActiveConversationId(id)
     setInterviewView('chat')
     setSidebarOpen(false)
   }
@@ -475,12 +539,14 @@ function App() {
   const switchConversation = (id) => {
     if (voice.isListening) voice.stopListening()
     if (voice.isSpeaking) voice.cancelSpeak()
+    if (abortControllerRef.current) abortControllerRef.current.abort()
     ttsBufferRef.current = ''
     setError(null)
     setInputValue('')
     setVoiceBase('')
+    setIsGenerating(false)
     setCurrentConversationId(id)
-    try { localStorage.setItem(CURRENT_CONV_KEY, id) } catch {}
+    setActiveConversationId(id)
     setInterviewView('chat')
     setSidebarOpen(false)
   }
@@ -718,7 +784,7 @@ function App() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
                       </button>
                     )}
-                    {!voice.isSpeaking && voice.ttsSupported && messages.length > 0 && (
+{!voice.isSpeaking && voice.ttsSupported && messages.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setAutoSpeak(v => !v)}
@@ -729,13 +795,26 @@ function App() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d={autoSpeak ? 'M15.54 8.46a5 5 0 010 7.07' : 'M23 9l-6 6M17 9l6 6'} /></svg>
                       </button>
                     )}
-                    <button type="submit" disabled={isLoading || !displayValue.trim() || status === 'disconnected'} className="composer-send" aria-label="Send">
-                      {isLoading ? (
-                        <span className="send-spinner" />
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" /></svg>
-                      )}
-                    </button>
+                    {isGenerating ? (
+                      <button
+                        type="button"
+                        onClick={stopGeneration}
+                        disabled={status === 'disconnected'}
+                        className="composer-send composer-stop"
+                        aria-label="Stop generation"
+                        title="Stop generation"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                      </button>
+                    ) : (
+                      <button type="submit" disabled={isLoading || !displayValue.trim() || status === 'disconnected'} className="composer-send" aria-label="Send">
+                        {isLoading ? (
+                          <span className="send-spinner" />
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" /></svg>
+                        )}
+                      </button>
+                    )}
                   </form>
                   <div className="composer-hint">
                     {status === 'disconnected' ? 'Backend is disconnected. Please start the backend server.' : voice.isListening ? 'Listening — press mic to stop' : 'Press Enter to send · Mic for voice input'}

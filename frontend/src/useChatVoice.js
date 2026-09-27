@@ -24,6 +24,9 @@ export function useChatVoice() {
   const recRef = useRef(null)
   const listeningIntent = useRef(false)
   const baseRef = useRef('')
+  const microphoneEnabled = useRef(false)
+  const userStopped = useRef(false)
+  const restartTimerRef = useRef(null)
 
   // TTS queue for streaming incremental speech
   const speakQueueRef = useRef([])
@@ -39,6 +42,13 @@ export function useChatVoice() {
     }
     setIsSpeaking(false)
   }, [ttsSupported])
+
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
+    }
+  }, [])
 
   const _playNext = useCallback(() => {
     if (!ttsSupported || typeof window === 'undefined') return
@@ -135,13 +145,16 @@ export function useChatVoice() {
   }, [ttsSupported, _playNext])
 
   const stopListening = useCallback(() => {
+    microphoneEnabled.current = false
+    userStopped.current = true
     listeningIntent.current = false
+    clearRestartTimer()
     if (recRef.current) {
       try { recRef.current.stop() } catch {}
     }
     setIsListening(false)
     setInterim('')
-  }, [])
+  }, [clearRestartTimer])
 
   const startListening = useCallback((baseText = '') => {
     if (!isSupported || !recRef.current) {
@@ -152,6 +165,8 @@ export function useChatVoice() {
     cancelSpeak()
     setError(null)
     baseRef.current = baseText || ''
+    microphoneEnabled.current = true
+    userStopped.current = false
     listeningIntent.current = true
     try {
       recRef.current.start()
@@ -159,15 +174,16 @@ export function useChatVoice() {
     } catch {
       try {
         recRef.current.stop()
-        setTimeout(() => {
-          if (listeningIntent.current) {
+        clearRestartTimer()
+        restartTimerRef.current = setTimeout(() => {
+          if (microphoneEnabled.current && listeningIntent.current && !userStopped.current) {
             try { recRef.current.start() } catch {}
           }
         }, 120)
       } catch {}
       return true
     }
-  }, [isSupported, cancelSpeak])
+  }, [isSupported, cancelSpeak, clearRestartTimer])
 
   useEffect(() => {
     if (!isSupported) return
@@ -213,48 +229,92 @@ export function useChatVoice() {
         // This will be handled by onFinal callback if set
         if (rec._onFinal) rec._onFinal(pending)
       }
-      // Only clear listening if intent was not continuous (we use non-continuous)
-      if (listeningIntent.current) {
-        // For false continuous, end naturally after utterance
-        listeningIntent.current = false
+      // Only continue listening if microphone is explicitly enabled by user AND user didn't explicitly stop
+      if (microphoneEnabled.current && !userStopped.current) {
+        // For non-continuous mode, restart to allow next utterance
+        listeningIntent.current = true
+        clearRestartTimer()
+        restartTimerRef.current = setTimeout(() => {
+          if (microphoneEnabled.current && listeningIntent.current && !userStopped.current && recRef.current) {
+            try { recRef.current.start() } catch {}
+          }
+        }, 250)
+        // Keep isListening true to keep UI in listening state
+        return
       }
+      // Microphone was turned OFF by user - stop completely
+      listeningIntent.current = false
       setIsListening(false)
       setInterim('')
+      // Reset userStopped flag after handling the stop
+      userStopped.current = false
     }
     rec.onerror = (e) => {
       const code = e.error || 'unknown'
+      // If microphone was explicitly turned OFF, don't treat errors as restart triggers
+      if (!microphoneEnabled.current) {
+        listeningIntent.current = false
+        setIsListening(false)
+        setInterim('')
+        return
+      }
       listeningIntent.current = false
       setIsListening(false)
       setInterim('')
       if (code === 'not-allowed' || code === 'permission-denied') {
         setError('Microphone permission denied. Please allow microphone access or continue typing.')
+        microphoneEnabled.current = false
       } else if (code === 'audio-capture') {
         setError('No microphone found. Please continue typing.')
+        microphoneEnabled.current = false
       } else if (code === 'no-speech') {
         setError(null)
+        // No speech is natural pause - restart if microphone still enabled and user didn't stop
+        if (microphoneEnabled.current && !userStopped.current) {
+          clearRestartTimer()
+          restartTimerRef.current = setTimeout(() => {
+            if (microphoneEnabled.current && listeningIntent.current && !userStopped.current && recRef.current) {
+              try { recRef.current.start() } catch {}
+            }
+          }, 300)
+        }
       } else if (code === 'aborted') {
         setError(null)
       } else {
         setError(null)
+        // For other errors, try restart if microphone still enabled and user didn't stop
+        if (microphoneEnabled.current && !userStopped.current) {
+          clearRestartTimer()
+          restartTimerRef.current = setTimeout(() => {
+            if (microphoneEnabled.current && listeningIntent.current && !userStopped.current && recRef.current) {
+              try { recRef.current.start() } catch {}
+            }
+          }, 400)
+        }
       }
     }
 
     recRef.current = rec
     return () => {
+      microphoneEnabled.current = false
+      userStopped.current = false
       listeningIntent.current = false
+      clearRestartTimer()
       try { rec.abort() } catch {}
       recRef.current = null
     }
-  }, [isSupported])
+  }, [isSupported, clearRestartTimer])
 
   useEffect(() => {
     return () => {
       // Cleanup speech on unmount
       try { if (ttsSupported) window.speechSynthesis.cancel() } catch {}
+      microphoneEnabled.current = false
       listeningIntent.current = false
+      clearRestartTimer()
       try { recRef.current?.abort() } catch {}
     }
-  }, [ttsSupported])
+  }, [ttsSupported, clearRestartTimer])
 
   const setOnFinal = useCallback((cb) => {
     if (recRef.current) recRef.current._onFinal = cb

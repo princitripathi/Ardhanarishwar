@@ -275,13 +275,20 @@ def test_validation_retry_success():
 
 def test_validation_fallback_for_unsupported_claim():
     import asyncio
+    from app.rag.store import reset_store
+    from app.rag.ingestion import clear_documents
 
     async def run():
+        # Ensure clean RAG state (no Recruweb doc from other tests)
+        reset_store()
+        clear_documents()
+        
         bad_text = "According to the company policy, you get 24 days of paid annual leave."
         with patch("app.services.orchestrator.generate_response", new=AsyncMock(return_value=mock_resp(bad_text))), \
              patch("app.agents.business_agent.generate_response", new=AsyncMock(return_value=mock_resp(bad_text))):
             from app.services.orchestrator import route_message
-            result = await route_message("What is the company leave policy?", conversation_id="val-unsupported")
+            # Use a query about a topic completely unrelated to Recruweb knowledge
+            result = await route_message("What is the Acme Corp's quarterly revenue forecast?", conversation_id="val-unsupported")
             assert result["response"] != bad_text or "I apologize" in result["response"] or "general guidance" in result["response"].lower() or result.get("validation_passed") is False
 
     asyncio.run(run())
